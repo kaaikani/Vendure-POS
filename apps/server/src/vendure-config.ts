@@ -9,6 +9,7 @@ import { defaultEmailHandlers, EmailPlugin, FileBasedTemplateLoader } from '@ven
 import { AssetServerPlugin } from '@vendure/asset-server-plugin';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
+import { LedgerPlugin } from './plugins/ledger/ledger.plugin';
 import 'dotenv/config';
 import path from 'path';
 
@@ -17,6 +18,7 @@ const serverPort = +process.env.PORT || 3000;
 
 export const config: VendureConfig = {
     apiOptions: {
+        hostname: '127.0.0.1',
         port: serverPort,
         adminApiPath: 'admin-api',
         shopApiPath: 'shop-api',
@@ -53,9 +55,23 @@ export const config: VendureConfig = {
     },
     // When adding or altering custom field definitions, the database will
     // need to be updated. See the "Migrations" section in README.md.
-    customFields: {},
+    customFields: {
+        ProductVariant: [
+            {
+                name: 'barcode',
+                type: 'string',
+                description: [
+                  { languageCode: 'en' as any, value: 'Physical Supermarket Barcode (EAN/UPC)' }
+                ],
+                ui: { component: 'text-form-input' },
+                unique: false, // For safety across environments
+            }
+        ]
+    },
     plugins: [
-        GraphiqlPlugin.init(),
+        GraphiqlPlugin.init({
+            route: 'graphiql',
+        }),
         AssetServerPlugin.init({
             route: 'assets',
             assetUploadDir: path.join(__dirname, '../static/assets'),
@@ -88,5 +104,6 @@ export const config: VendureConfig = {
                 ? path.join(__dirname, '../dist/dashboard')
                 : path.join(__dirname, 'dashboard'),
         }),
+        LedgerPlugin,
     ],
 };

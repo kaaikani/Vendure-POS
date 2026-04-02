@@ -63,9 +63,7 @@ export default function RootLayout({children}: LayoutProps<'/'>) {
                 className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
             >
                 <ThemeProvider>
-                    <Navbar />
                     {children}
-                    <Footer />
                     <Toaster />
                 </ThemeProvider>
             </body>
