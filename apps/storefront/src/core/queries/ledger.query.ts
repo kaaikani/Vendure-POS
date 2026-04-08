@@ -2,6 +2,7 @@ import { gql } from './gql';
 
 export interface LedgerPayment {
   id: string;
+  createdAt: string;
   amount: number;
   paymentDate: string;
   paymentMode: 'CASH' | 'BANK' | 'UPI' | 'CREDIT';
@@ -16,7 +17,7 @@ export interface Ledger {
   amount: number;
   paidAmount: number;
   balance: number;
-  status: 'PENDING' | 'PARTIAL' | 'COMPLETED';
+  status: 'PENDING' | 'PARTIALLY_PAID' | 'FULLY_PAID';
   creditDays: number;
   payments: LedgerPayment[];
 }
@@ -35,7 +36,7 @@ export class GetLedgersQuery {
       query Ledgers($type: LedgerType!) {
         ledgers(type: $type) {
           id type partyName invoiceNumber invoiceDate amount paidAmount balance status creditDays
-          payments { id amount paymentDate paymentMode }
+          payments { id createdAt amount paymentDate paymentMode }
         }
       }
     `, { useAdmin: true, variables: { type } });
@@ -50,7 +51,7 @@ export class GetLedgerByIdQuery {
       query Ledger($id: ID!) {
         ledger(id: $id) {
           id type partyName invoiceNumber invoiceDate amount paidAmount balance status creditDays
-          payments { id amount paymentDate paymentMode }
+          payments { id createdAt amount paymentDate paymentMode }
         }
       }
     `, { useAdmin: true, variables: { id } });
@@ -83,6 +84,7 @@ export class AddPaymentCommand {
       mutation AddPayment($ledgerId: ID!, $input: PaymentInput!) {
         addPayment(ledgerId: $ledgerId, input: $input) {
           id type partyName invoiceNumber invoiceDate amount paidAmount balance status creditDays
+          payments { id createdAt amount paymentDate paymentMode }
         }
       }
     `, { 

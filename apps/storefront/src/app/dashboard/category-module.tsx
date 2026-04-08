@@ -1,27 +1,36 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, ArrowLeft, Loader2, AlertTriangle, PlusCircle, LayoutGrid, CheckCircle
+import {
+  Search, ArrowLeft, Loader2, AlertTriangle, PlusCircle, LayoutGrid, CheckCircle, ChevronDown
 } from 'lucide-react';
-import { 
-  PosCategory, PosProduct, 
-  GetPosCategoriesQuery, GetPosProductsQuery 
+import {
+  PosCategory, PosProduct,
+  GetPosCategoriesQuery, GetPosProductsQuery
 } from '../../core/queries/PosQueries';
+
+interface GroupedProduct {
+  name: string;
+  variants: PosProduct[];
+  selectedIdx: number;
+}
 
 export default function CategoryModule() {
   const [categories, setCategories] = useState<PosCategory[]>([]);
   const [products, setProducts] = useState<PosProduct[]>([]);
-  
+
   const [viewState, setViewState] = useState<'loading' | 'root' | 'detail' | 'error'>('loading');
   const [selectedCategory, setSelectedCategory] = useState<PosCategory | null>(null);
-  
+
   // Search inputs
   const [catSearch, setCatSearch] = useState('');
   const [prodSearch, setProdSearch] = useState('');
 
   // UI States
   const [addedToast, setAddedToast] = useState<string | null>(null);
+
+  // Track selected variant per product group
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetchInitialData();
@@ -93,6 +102,34 @@ export default function CategoryModule() {
   const filteredCategories = categories.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase()));
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(prodSearch.toLowerCase()) || p.id.toLowerCase().includes(prodSearch.toLowerCase()));
 
+  // Strip size/quantity suffix from product name to get base name for grouping
+  // Matches patterns like: "100g", "1kg", "500ml", "1L", "6 pack", "12pk", "(Premium)"
+  const stripSizeSuffix = (name: string): { base: string; size: string } => {
+    const sizeRegex = /\s*\b(\d+(?:\.\d+)?)\s*(g|gm|gms|kg|ml|l|ltr|pc|pcs|pk|pack)\b\s*$/i;
+    const match = name.match(sizeRegex);
+    if (match) {
+      return { base: name.slice(0, match.index).trim(), size: match[0].trim() };
+    }
+    return { base: name, size: '' };
+  };
+
+  // Group variants by base product name (strip size suffix)
+  const groupedProducts: GroupedProduct[] = [];
+  const groupMap: Record<string, PosProduct[]> = {};
+  filteredProducts.forEach(p => {
+    const { base, size } = stripSizeSuffix(p.name);
+    // Override quantityStr with extracted size if present
+    const productCopy = { ...p, quantityStr: size || p.quantityStr };
+    if (!groupMap[base]) groupMap[base] = [];
+    groupMap[base].push(productCopy);
+  });
+  Object.entries(groupMap).forEach(([name, variants]) => {
+    const idx = selectedVariants[name] || 0;
+    // Sort variants by price ascending
+    const sorted = [...variants].sort((a, b) => a.price - b.price);
+    groupedProducts.push({ name, variants: sorted, selectedIdx: Math.min(idx, sorted.length - 1) });
+  });
+
   // 1. Loading State
   if (viewState === 'loading') {
     return (
@@ -135,7 +172,7 @@ export default function CategoryModule() {
                <input 
                  type="text" value={catSearch} onChange={e=>setCatSearch(e.target.value)} 
                  placeholder="Search Category Directory..." 
-                 className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-sm shadow-inner transition-all"
+                 className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-sm shadow-inner transition-all text-slate-800 placeholder:text-slate-400"
                />
              </div>
           </div>
@@ -174,7 +211,7 @@ export default function CategoryModule() {
                   <h1 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                     <span className="text-emerald-600">DIR:</span> {selectedCategory?.name} Database
                   </h1>
-                  <p className="text-[11px] font-black text-slate-400 tracking-wider font-mono uppercase mt-0.5">30 highly structured rows initialized via IQuery</p>
+                  <p className="text-[11px] font-black text-slate-400 tracking-wider font-mono uppercase mt-0.5">{groupedProducts.length} products | {filteredProducts.length} variants</p>
                </div>
              </div>
              
@@ -183,7 +220,7 @@ export default function CategoryModule() {
                <input 
                  type="text" value={prodSearch} onChange={e=>setProdSearch(e.target.value)} 
                  placeholder={`Search by Name or ID in ${selectedCategory?.name}...`} 
-                 className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-sm shadow-inner transition-all"
+                 className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-sm shadow-inner transition-all text-slate-800 placeholder:text-slate-400"
                />
              </div>
           </div>
@@ -200,28 +237,50 @@ export default function CategoryModule() {
                   <thead className="bg-slate-100 sticky top-0 z-10 text-[11px] uppercase tracking-widest text-slate-500 font-black shadow-sm">
                     <tr>
                       <th className="p-4 border-b border-slate-200">Product Name</th>
-                      <th className="p-4 border-b border-slate-200 w-44">Product ID</th>
-                      <th className="p-4 border-b border-slate-200 w-32">Quantity</th>
+                      <th className="p-4 border-b border-slate-200 w-52">Variant</th>
                       <th className="p-4 border-b border-slate-200 w-32 text-right">Rate (₹)</th>
                       <th className="p-4 border-b border-slate-200 w-32 text-center">POS Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {filteredProducts.map(p => (
-                      <tr key={p.id} className="hover:bg-emerald-50/40 transition-colors group cursor-pointer" onClick={() => handleAddToPosCart(p)}>
-                        <td className="p-4">
-                           <span className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">{p.name}</span>
-                        </td>
-                        <td className="p-4 font-mono text-xs font-bold text-slate-400 group-hover:text-emerald-600 transition-colors">{p.id}</td>
-                        <td className="p-4 text-slate-600 font-bold">{p.quantityStr}</td>
-                        <td className="p-4 text-right font-black text-slate-800 group-hover:text-emerald-700">₹{p.price.toFixed(2)}</td>
-                        <td className="p-4 text-center">
-                           <button className="px-3 py-1 bg-transparent border-2 border-emerald-500 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white rounded text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1 mx-auto transition-all shadow-sm">
-                             <PlusCircle size={14}/> Send to POS
-                           </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {groupedProducts.map(g => {
+                      const selected = g.variants[g.selectedIdx];
+                      return (
+                        <tr key={g.name} className="hover:bg-emerald-50/40 transition-colors group">
+                          <td className="p-4">
+                            <span className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors text-base">{g.name}</span>
+                            <span className="text-[10px] text-slate-400 font-bold ml-2">({g.variants.length} {g.variants.length > 1 ? 'variants' : 'variant'})</span>
+                          </td>
+                          <td className="p-4">
+                            {g.variants.length > 1 ? (
+                              <div className="relative">
+                                <select
+                                  value={g.selectedIdx}
+                                  onChange={(e) => { e.stopPropagation(); setSelectedVariants(prev => ({ ...prev, [g.name]: parseInt(e.target.value) })); }}
+                                  className="w-full border-2 border-emerald-200 rounded-lg px-3 py-2 text-sm font-black text-slate-700 bg-white outline-none focus:border-emerald-500 appearance-none cursor-pointer hover:border-emerald-400 transition pr-8"
+                                >
+                                  {g.variants.map((v, i) => (
+                                    <option key={v.id} value={i}>{v.quantityStr} — ₹{v.price.toFixed(0)}</option>
+                                  ))}
+                                </select>
+                                <ChevronDown size={16} className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none" />
+                              </div>
+                            ) : (
+                              <span className="font-bold text-slate-600 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 inline-block">{selected.quantityStr}</span>
+                            )}
+                          </td>
+                          <td className="p-4 text-right font-black text-slate-800 group-hover:text-emerald-700 text-lg">₹{selected.price.toFixed(2)}</td>
+                          <td className="p-4 text-center">
+                            <button
+                              onClick={() => handleAddToPosCart(selected)}
+                              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 mx-auto transition-all shadow-sm hover:bg-emerald-500 active:scale-95"
+                            >
+                              <PlusCircle size={14}/> Send to POS
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

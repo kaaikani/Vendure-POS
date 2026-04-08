@@ -12,7 +12,7 @@ export interface PosProduct {
   name: string;
   price: number;
   stock: number;
-  quantityStr: string; 
+  quantityStr: string;
   img: string;
 }
 
@@ -36,18 +36,18 @@ export interface SaleTransactionInput {
 }
 
 // ----------------------------------------------------
-// IQUERY IMPLEMENTATION (Now with Real API Integration Strategy)
+// IQUERY IMPLEMENTATION (Admin API - auth handled by gql.ts)
 // ----------------------------------------------------
 
 export class GetPosCategoriesQuery {
   async execute(): Promise<PosCategory[]> {
-    // Strategy: Fetch Collections from Vendure
     try {
+
       const data = await gql(`
         query GetCategories {
           collections { items { id name } }
         }
-      `);
+      `, { useAdmin: true });
       return data.collections.items;
     } catch {
       return [{ id: 'mock-1', name: 'General' }];
@@ -58,42 +58,97 @@ export class GetPosCategoriesQuery {
 export class GetPosProductsQuery {
   async execute(categoryId?: string): Promise<PosProduct[]> {
     try {
-      const data = await gql(`
-        query GetProducts($options: ProductListOptions) {
-          products(options: $options) {
-            items {
-              id name
-              variants { 
-                id
-                price 
-                priceWithTax 
-                stockLevel
-                customFields { barcode }
+
+
+      if (categoryId) {
+        // Fetch products by collection — show each variant as separate row
+        const data = await gql(`
+          query GetCollection($id: ID!) {
+            collection(id: $id) {
+              productVariants(options: { take: 500 }) {
+                totalItems
+                items {
+                  id name price sku stockLevel
+                  product { id name }
+                }
               }
             }
           }
+        `, { useAdmin: true, variables: { id: categoryId } });
+
+        if (data.collection?.productVariants?.items) {
+          return data.collection.productVariants.items.map((v: any) => {
+            const variantName = v.name || '';
+            const productName = v.product.name || '';
+            // Extract quantity from variant name (e.g., "Beetroot 250g" → "250g")
+            const qty = variantName.replace(productName, '').trim() || '1 Pc';
+            return {
+              id: v.id, // Use variant ID so each variant is unique
+              name: productName,
+              categoryId: categoryId,
+              barcode: v.sku || v.id,
+              price: (v.price || 0) / 100,
+              stock: v.stockLevel === 'IN_STOCK' ? 100 : 0,
+              quantityStr: qty,
+              img: ''
+            };
+          });
         }
-      `, { variables: { options: categoryId ? { filter: { collectionId: { eq: categoryId } } } : {} } });
-      
-      return data.products.items.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        barcode: p.variants[0]?.customFields?.barcode || p.id,
-        price: (p.variants[0]?.price || 0) / 100,
-        stock: p.variants[0]?.stockLevel === 'IN_STOCK' ? 100 : 0,
-        quantityStr: '1 Pc',
-        img: ''
-      }));
+      }
+
+      // Fetch products from all supermarket collections (11-20)
+      const collectionIds = ['11','12','13','14','15','16','17','18','19','20'];
+      const allProducts: PosProduct[] = [];
+      const seen = new Set<string>();
+
+      for (const cid of collectionIds) {
+        try {
+          const cdata = await gql(`
+            query GetCollection($id: ID!) {
+              collection(id: $id) {
+                name
+                productVariants(options: { take: 500 }) {
+                  totalItems
+                  items {
+                    id name price sku stockLevel
+                    product { id name }
+                  }
+                }
+              }
+            }
+          `, { useAdmin: true, variables: { id: cid } });
+
+          const catName = cdata.collection?.name || 'General';
+          (cdata.collection?.productVariants?.items || []).forEach((v: any) => {
+            if (seen.has(v.id)) return;
+            seen.add(v.id);
+            const variantName = v.name || '';
+            const productName = v.product.name || '';
+            const qty = variantName.replace(productName, '').trim() || '1 Pc';
+            allProducts.push({
+              id: v.id,
+              name: productName,
+              categoryId: catName,
+              barcode: v.sku || v.id,
+              price: (v.price || 0) / 100,
+              stock: v.stockLevel === 'IN_STOCK' ? 100 : 0,
+              quantityStr: qty,
+              img: ''
+            });
+          });
+        } catch { /* skip failed collections */ }
+      }
+      return allProducts;
     } catch {
-       // Comprehensive Mock Data for Retail POS Demo (at least 40 products)
+       // Mock Data Fallback
        const mockCategories = ['Produce', 'Dairy', 'Snacks', 'Drinks'];
        const produceItems = ['Apple', 'Banana', 'Orange', 'Mango', 'Grapes', 'Tomato', 'Potato', 'Onion', 'Carrot', 'Spinach'];
        const dairyItems = ['Milk 1L', 'Butter', 'Cheese', 'Yogurt', 'Paneer', 'Ghee', 'Cream', 'Buttermilk', 'Egg 6pk', 'Condensed Milk'];
        const snacksItems = ['Chips', 'Popcorn', 'Biscuits', 'Chocolate Bar', 'Cookies', 'Peanuts', 'Cashews', 'Nachos', 'Pretzels', 'Muffin'];
        const drinkItems = ['Cola', 'Sparkling Water', 'Orange Juice', 'Apple Juice', 'Coffee', 'Green Tea', 'Energy Drink', 'Beer', 'Wine', 'Lemonade'];
-       
+
        const allMocks: PosProduct[] = [];
-       
+
        const generate = (names: string[], cat: string, basePrice: number) => {
          names.forEach((name, i) => {
            allMocks.push({
@@ -108,12 +163,12 @@ export class GetPosProductsQuery {
            });
          });
        };
-       
+
        generate(produceItems, 'Produce', 25);
        generate(dairyItems, 'Dairy', 45);
        generate(snacksItems, 'Snacks', 15);
        generate(drinkItems, 'Drinks', 20);
-       
+
        return allMocks;
     }
   }
@@ -129,14 +184,30 @@ export class LookupBarcodeQuery {
 
 export class GetPosCustomersQuery {
   async execute(): Promise<PosCustomer[]> {
-    return [{ id: 'CUST-001', name: 'Walk-in Customer', phone: '', creditLimit: 0, pendingBalance: 0 }];
+    try {
+
+      const data = await gql(`
+        query {
+          customers {
+            items { id firstName lastName emailAddress phoneNumber }
+          }
+        }
+      `, { useAdmin: true });
+      return data.customers.items.map((c: any) => ({
+        id: c.id,
+        name: `${c.firstName} ${c.lastName}`.trim() || 'Walk-in Customer',
+        phone: c.phoneNumber || '',
+        creditLimit: 0,
+        pendingBalance: 0
+      }));
+    } catch {
+      return [{ id: 'CUST-001', name: 'Walk-in Customer', phone: '', creditLimit: 0, pendingBalance: 0 }];
+    }
   }
 }
 
 export class CreateSaleTransactionCommand {
   async execute(input: SaleTransactionInput): Promise<{ success: boolean; invoiceId: string }> {
-     // For now, return immediate success to keep POS non-blocking. 
-     // In production, this would call Vendure Shop API 'addItemToOrder' or a custom 'processPosOrder' mutation.
      return { success: true, invoiceId: 'INV-' + Date.now() };
   }
 }

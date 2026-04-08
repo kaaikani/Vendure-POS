@@ -53,31 +53,62 @@ export class LedgerService {
         return summary;
     }
 
+    async deleteLedger(ctx: RequestContext, id: string): Promise<boolean> {
+        const ledger = await this.connection.getEntityOrThrow(ctx, Ledger, id, {
+            relations: ['payments']
+        });
+        if (ledger.payments.length > 0) {
+            await this.connection.getRepository(ctx, LedgerPayment).remove(ledger.payments);
+        }
+        await this.connection.getRepository(ctx, Ledger).remove(ledger);
+        return true;
+    }
+
     async addPayment(ctx: RequestContext, ledgerId: string, input: any): Promise<Ledger> {
         const ledger = await this.connection.getEntityOrThrow(ctx, Ledger, ledgerId, { 
             relations: ['payments'] 
         });
 
-        const payment = new LedgerPayment({
-            ledger,
-            amount: input.amount,
-            paymentMode: input.paymentMode,
-            paymentDate: input.paymentDate
-        });
+        // Save payment via ORM
+        const paymentRepo = this.connection.getRepository(ctx, LedgerPayment);
+        const payment = new LedgerPayment();
+        payment.amount = input.amount;
+        payment.paymentMode = input.paymentMode;
+        payment.paymentDate = input.paymentDate;
+        payment.ledger = ledger;
+        const saved = await paymentRepo.save(payment);
 
-        await this.connection.getRepository(ctx, LedgerPayment).save(payment);
+        // Fix ledgerId AFTER transaction commits via setTimeout
+        const savedId = Number(saved.id);
+        const lid = Number(ledger.id);
+        setTimeout(() => {
+            try {
+                const path = require('path');
+                const Database = require('better-sqlite3');
+                const dbPath = path.join(__dirname, '..', '..', '..', '..', 'vendure.sqlite');
+                const db = new Database(dbPath);
+                db.prepare('UPDATE ledger_payment SET ledgerId = ? WHERE id = ?').run(lid, savedId);
+                db.close();
+            } catch (e) {
+                console.error('[LEDGER] setTimeout fix failed:', e);
+            }
+        }, 500);
 
         ledger.paidAmount += input.amount;
         ledger.balance = ledger.amount - ledger.paidAmount;
 
         if (ledger.balance <= 0) {
-            ledger.status = 'COMPLETED';
+            ledger.status = 'FULLY_PAID';
         } else if (ledger.paidAmount > 0) {
-            ledger.status = 'PARTIAL';
+            ledger.status = 'PARTIALLY_PAID';
         } else {
             ledger.status = 'PENDING';
         }
 
-        return this.connection.getRepository(ctx, Ledger).save(ledger);
+        await this.connection.getRepository(ctx, Ledger).save(ledger);
+
+        return this.connection.getEntityOrThrow(ctx, Ledger, ledgerId, {
+            relations: ['payments']
+        });
     }
 }

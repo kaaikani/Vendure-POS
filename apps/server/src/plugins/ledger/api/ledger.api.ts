@@ -6,10 +6,10 @@ const ledgerApiExtensions = gql`
         SUPPLIER 
     }
 
-    enum LedgerStatus { 
-        PENDING 
-        PARTIAL 
-        COMPLETED 
+    enum LedgerStatus {
+        PENDING
+        PARTIALLY_PAID
+        FULLY_PAID
     }
 
     enum PaymentMode { 
@@ -74,6 +74,7 @@ const ledgerApiExtensions = gql`
 
     extend type Mutation {
         createLedger(input: CreateLedgerInput!): Ledger!
+        deleteLedger(id: ID!): Boolean!
         addPayment(ledgerId: ID!, input: PaymentInput!): Ledger!
     }
 `;

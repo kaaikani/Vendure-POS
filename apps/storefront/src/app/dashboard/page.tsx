@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { 
   BarChart, BookOpen, Grid, Box, ShoppingBag, ScanLine, FileText, UserCircle,
   Package, PlusCircle, RefreshCw
@@ -12,6 +12,7 @@ import CategoryModule from './category-module';
 import PosModule from './pos-module';
 import BarcodeModule from './barcode-module';
 import DashboardModule from './dashboard-module';
+import ReportModule from './report-module';
 
 function PlaceholderView({ title, icon: Icon, desc }: any) {
   return (
@@ -40,16 +41,19 @@ export default function VendureDashboard() {
   ];
 
   const renderContent = () => {
-    switch(activeTab) {
-      case 'inventory': return <InventoryModule />;
-      case 'pos': return <PosModule />;
-      case 'dashboard': return <DashboardModule />;
-      case 'ledger': return <LedgerModule />;
-      case 'category': return <CategoryModule />;
-      case 'barcode': return <BarcodeModule />;
-      case 'report': return <PlaceholderView title="Reports Engine" icon={FileText} desc="generating custom PDF sales and inventory reports" />;
-      default: return null;
-    }
+    const content = (() => {
+      switch(activeTab) {
+        case 'inventory': return <InventoryModule />;
+        case 'pos': return <PosModule />;
+        case 'dashboard': return <DashboardModule />;
+        case 'ledger': return <LedgerModule />;
+        case 'category': return <CategoryModule />;
+        case 'barcode': return <BarcodeModule />;
+        case 'report': return <ReportModule />;
+        default: return null;
+      }
+    })();
+    return <Suspense fallback={<div className="flex items-center justify-center h-[80vh] text-slate-400">Loading...</div>}>{content}</Suspense>;
   };
 
   return (

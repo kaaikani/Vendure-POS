@@ -30,11 +30,11 @@ export class Ledger extends VendureEntity {
     balance: number;
 
     @Column()
-    status: 'PENDING' | 'PARTIAL' | 'COMPLETED';
+    status: 'PENDING' | 'PARTIALLY_PAID' | 'FULLY_PAID';
 
     @Column()
     creditDays: number;
 
-    @OneToMany(type => LedgerPayment, payment => payment.ledger)
+    @OneToMany(() => LedgerPayment, payment => payment.ledger)
     payments: LedgerPayment[];
 }

@@ -1,5 +1,5 @@
 import { VendureEntity, DeepPartial } from '@vendure/core';
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Ledger } from './ledger.entity';
 
 @Entity()
@@ -17,6 +17,10 @@ export class LedgerPayment extends VendureEntity {
     @Column()
     paymentMode: 'CASH' | 'BANK' | 'UPI' | 'CREDIT';
 
-    @ManyToOne(type => Ledger, ledger => ledger.payments)
+    @Column({ nullable: true })
+    ledgerId: number;
+
+    @ManyToOne(() => Ledger, ledger => ledger.payments, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'ledgerId' })
     ledger: Ledger;
 }
