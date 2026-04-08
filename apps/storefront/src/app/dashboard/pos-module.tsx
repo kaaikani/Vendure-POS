@@ -52,8 +52,8 @@ export default function PosModule() {
   const [customers, setCustomers] = useState<PosCustomer[]>([]);
 
   // Invoice Details
-  const [invoiceNo] = useState('INV-' + Math.floor(Math.random() * 900000 + 100000));
-  const [currentDate] = useState(new Date().toLocaleDateString('en-GB'));
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [currentDate, setCurrentDate] = useState('');
 
   const [saleType, setSaleType] = useState<'ONLINE' | 'OFFLINE' | 'CREDIT'>('OFFLINE');
 
@@ -87,6 +87,8 @@ export default function PosModule() {
 
   useEffect(() => {
     setIsClient(true);
+    setInvoiceNo('INV-' + Math.floor(Math.random() * 900000 + 100000));
+    setCurrentDate(new Date().toLocaleDateString('en-GB'));
     try {
       const saved = localStorage.getItem('pos_cart');
       if (saved) {

@@ -28,7 +28,7 @@ function PlaceholderView({ title, icon: Icon, desc }: any) {
 
 // --- MAIN PAGE LAYOUT ---
 export default function VendureDashboard() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('pos');
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart },

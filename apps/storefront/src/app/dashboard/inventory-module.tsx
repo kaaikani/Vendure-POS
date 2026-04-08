@@ -1,38 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   Package, PlusCircle, RefreshCw, Search, Filter, ArrowUpRight, ArrowDownRight,
   AlertTriangle, Truck, FileText, Download, MoreVertical, Edit, Eye, Trash2,
   Box, CheckCircle, BarChart2, Layers, Repeat, ShieldAlert, Archive
 } from 'lucide-react';
+import { gql } from '../../core/queries/gql';
 
-const ADMIN_API = 'http://127.0.0.1:3000/admin-api';
-
-async function fetchVendure(query: string, variables = {}) {
-  await fetch(ADMIN_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query: `
-        mutation {
-          login(username: "superadmin", password: "superadmin") {
-            ... on CurrentUser { id }
-          }
-        }
-      `
-    })
-  });
-  
-  const res = await fetch(ADMIN_API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ query, variables })
-  });
-  const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0].message);
-  return json.data;
+async function fetchVendure(query: string, variables: Record<string, any> = {}) {
+  return gql(query, { useAdmin: true, variables });
 }
 
 const TABS = [

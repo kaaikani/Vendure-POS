@@ -207,7 +207,188 @@ export class GetPosCustomersQuery {
 }
 
 export class CreateSaleTransactionCommand {
-  async execute(input: SaleTransactionInput): Promise<{ success: boolean; invoiceId: string }> {
-     return { success: true, invoiceId: 'INV-' + Date.now() };
+  async execute(payload: any): Promise<{ success: boolean; invoiceId: string; orderId?: string; orderCode?: string; error?: string }> {
+    const invoiceId = payload?.invoiceId || ('INV-' + Date.now());
+    let orderId: string | undefined;
+    let orderCode: string | undefined;
+
+    try {
+      // 1. Create draft order
+      const createRes = await gql(`
+        mutation { createDraftOrder { id code state } }
+      `, { useAdmin: true });
+      orderId = createRes.createDraftOrder.id;
+      orderCode = createRes.createDraftOrder.code;
+
+      // 2. Add each cart item to the draft order
+      const items = payload?.items || [];
+      for (const item of items) {
+        const res = await gql(`
+          mutation AddItem($orderId: ID!, $input: AddItemToDraftOrderInput!) {
+            addItemToDraftOrder(orderId: $orderId, input: $input) {
+              ... on Order { id }
+              ... on ErrorResult { errorCode message }
+            }
+          }
+        `, {
+          useAdmin: true,
+          variables: {
+            orderId,
+            input: {
+              productVariantId: item.id,
+              quantity: item.qty || 1,
+            },
+          },
+        });
+        if (res?.addItemToDraftOrder?.errorCode) {
+          console.warn('addItemToDraftOrder failed:', res.addItemToDraftOrder);
+        }
+      }
+
+      // 3. Set customer (if provided)
+      const customer = payload?.customer || {};
+      const isWalkIn = !customer.name || customer.name === 'Walk-in Customer';
+      if (!isWalkIn) {
+        const parts = String(customer.name).trim().split(/\s+/);
+        const firstName = parts[0] || 'Walk-in';
+        const lastName = parts.slice(1).join(' ') || 'Customer';
+        const safePhone = (customer.phone || 'walkin').toString().replace(/\D/g, '') || 'walkin';
+        const email = `${safePhone}@pos.local`;
+        try {
+          await gql(`
+            mutation SetCustomer($orderId: ID!, $input: CreateCustomerInput!) {
+              setCustomerForDraftOrder(orderId: $orderId, input: $input) {
+                ... on Order { id }
+                ... on ErrorResult { errorCode message }
+              }
+            }
+          `, {
+            useAdmin: true,
+            variables: {
+              orderId,
+              input: {
+                firstName,
+                lastName,
+                emailAddress: email,
+                phoneNumber: customer.phone || '',
+              },
+            },
+          });
+        } catch (e) { console.warn('setCustomerForDraftOrder failed:', e); }
+      }
+
+      // 4. Set shipping address (required for state transition)
+      try {
+        await gql(`
+          mutation SetAddr($orderId: ID!, $input: CreateAddressInput!) {
+            setDraftOrderShippingAddress(orderId: $orderId, input: $input) {
+              ... on Order { id }
+            }
+          }
+        `, {
+          useAdmin: true,
+          variables: {
+            orderId,
+            input: {
+              fullName: customer.name || 'Walk-in Customer',
+              streetLine1: customer.address || 'POS Walk-in',
+              city: 'Store',
+              postalCode: '000000',
+              countryCode: 'IN',
+              phoneNumber: customer.phone || '',
+            },
+          },
+        });
+
+        await gql(`
+          mutation SetBillAddr($orderId: ID!, $input: CreateAddressInput!) {
+            setDraftOrderBillingAddress(orderId: $orderId, input: $input) {
+              ... on Order { id }
+            }
+          }
+        `, {
+          useAdmin: true,
+          variables: {
+            orderId,
+            input: {
+              fullName: customer.name || 'Walk-in Customer',
+              streetLine1: customer.address || 'POS Walk-in',
+              city: 'Store',
+              postalCode: '000000',
+              countryCode: 'IN',
+              phoneNumber: customer.phone || '',
+            },
+          },
+        });
+      } catch (e) { console.warn('Set address failed:', e); }
+
+      // 5. Pick first eligible shipping method and set it
+      try {
+        const smRes = await gql(`
+          query EligibleShipping($orderId: ID!) {
+            eligibleShippingMethodsForDraftOrder(orderId: $orderId) { id price name }
+          }
+        `, { useAdmin: true, variables: { orderId } });
+        const methods = smRes?.eligibleShippingMethodsForDraftOrder || [];
+        if (methods.length > 0) {
+          await gql(`
+            mutation SetSM($orderId: ID!, $smId: ID!) {
+              setDraftOrderShippingMethod(orderId: $orderId, shippingMethodId: $smId) {
+                ... on Order { id }
+                ... on ErrorResult { errorCode message }
+              }
+            }
+          `, { useAdmin: true, variables: { orderId, smId: methods[0].id } });
+        }
+      } catch (e) { console.warn('Set shipping method failed:', e); }
+
+      // 6. Transition order to ArrangingPayment
+      try {
+        const tRes = await gql(`
+          mutation Transition($id: ID!) {
+            transitionOrderToState(id: $id, state: "ArrangingPayment") {
+              ... on Order { id state }
+              ... on OrderStateTransitionError { errorCode message transitionError }
+            }
+          }
+        `, { useAdmin: true, variables: { id: orderId } });
+
+        if (tRes?.transitionOrderToState?.state === 'ArrangingPayment') {
+          // 7. Add manual payment to settle the order
+          const payRes = await gql(`
+            mutation Pay($input: ManualPaymentInput!) {
+              addManualPaymentToOrder(input: $input) {
+                ... on Order { id state }
+                ... on ErrorResult { errorCode message }
+              }
+            }
+          `, {
+            useAdmin: true,
+            variables: {
+              input: {
+                orderId,
+                method: 'standard-payment',
+                transactionId: invoiceId,
+                metadata: {
+                  paymentMode: payload?.saleType || 'OFFLINE',
+                  receivedAmount: payload?.receivedAmount || 0,
+                  posInvoiceId: invoiceId,
+                },
+              },
+            },
+          });
+          if (payRes?.addManualPaymentToOrder?.errorCode) {
+            console.warn('addManualPaymentToOrder failed:', payRes.addManualPaymentToOrder);
+          }
+        } else {
+          console.warn('transitionOrderToState failed:', tRes?.transitionOrderToState);
+        }
+      } catch (e) { console.warn('Order transition / payment failed:', e); }
+
+      return { success: true, invoiceId, orderId, orderCode };
+    } catch (err: any) {
+      console.error('CreateSaleTransactionCommand failed:', err);
+      return { success: false, invoiceId, orderId, orderCode, error: err?.message || 'Unknown error' };
+    }
   }
 }
