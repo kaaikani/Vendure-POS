@@ -9,13 +9,15 @@
     "useDefineForClassFields": false,
     "strictPropertyInitialization": false,
     "target": "es2019",
-    "strict": true,
+    "strict": false,
     "sourceMap": false,
     "skipLibCheck": true,
+    "allowJs": true,
+    "checkJs": false,
     "outDir": "./dist",
     "baseUrl": "./"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.js", "src/**/*.ts"],
   "exclude": [
     "node_modules",
     "migration.ts",

@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "paths": {
       "@/gql": [
-        "./src/gql/graphql.ts"
+        "./src/gql/graphql.js"
       ],
       "@/vdb/*": [
         "../.././node_modules/@vendure/dashboard/src/lib/*"
@@ -15,7 +15,7 @@
   },
   "include": [
     "src/plugins/**/dashboard/*",
-    "src/gql/**/*.ts",
+    "src/gql/**/*.js",
     "vite.*.*ts"
   ]
 }

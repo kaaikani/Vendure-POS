@@ -3,6 +3,7 @@ import {
     DefaultJobQueuePlugin,
     DefaultSchedulerPlugin,
     DefaultSearchPlugin,
+    LanguageCode,
     VendureConfig,
 } from '@vendure/core';
 import { defaultEmailHandlers, EmailPlugin, FileBasedTemplateLoader } from '@vendure/email-plugin';
@@ -10,6 +11,7 @@ import { AssetServerPlugin } from '@vendure/asset-server-plugin';
 import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import { LedgerPlugin } from './plugins/ledger/ledger.plugin';
+import { PosAuthPlugin } from './plugins/pos-auth/pos-auth.plugin';
 import 'dotenv/config';
 import path from 'path';
 
@@ -61,7 +63,7 @@ export const config: VendureConfig = {
                 name: 'barcode',
                 type: 'string',
                 description: [
-                  { languageCode: 'en' as any, value: 'Physical Supermarket Barcode (EAN/UPC)' }
+                  { languageCode: LanguageCode.en , value: 'Physical Supermarket Barcode (EAN/UPC)' }
                 ],
                 ui: { component: 'text-form-input' },
                 unique: false, // For safety across environments
@@ -105,5 +107,6 @@ export const config: VendureConfig = {
                 : path.join(__dirname, 'dashboard'),
         }),
         LedgerPlugin,
+        PosAuthPlugin,
     ],
 };
