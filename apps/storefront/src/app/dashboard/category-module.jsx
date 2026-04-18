@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ArrowLeft, Loader2, AlertTriangle, PlusCircle, LayoutGrid, CheckCircle, ChevronDown, Plus, XCircle, Pencil, Trash2, Package, IndianRupee, Save } from 'lucide-react';
 import { gql } from '../../core/queries/gql';
-import { GetPosCategoriesQuery, GetPosProductsQuery } from '../../core/queries/PosQueries';
+import { GetPosCategoriesQuery, GetPosProductsQuery, invalidateProductsCache, invalidateCategoriesCache } from '../../core/queries/PosQueries';
 
 // ── Vendure Product CRUD via Admin API ──
 async function createVendureProduct(input) {
@@ -138,6 +138,7 @@ export default function ProductsModule() {
 
     const refreshProducts = async () => {
         if (!selectedCategory) return;
+        invalidateProductsCache(); // force fresh fetch after CRUD
         const prods = await new GetPosProductsQuery().execute(selectedCategory.id);
         setProducts(prods);
     };
@@ -278,7 +279,7 @@ export default function ProductsModule() {
         return (<div className="flex items-center justify-center h-[85vh] bg-slate-50 rounded-xl border border-slate-200"><Loader2 className="animate-spin text-emerald-500" size={48}/></div>);
     }
     if (viewState === 'error') {
-        return (<div className="flex flex-col items-center justify-center h-[85vh] bg-slate-50 rounded-xl border border-slate-200 text-slate-500">
+        return (<div className="flex flex-col items-center justify-center h-[85vh] bg-slate-50 rounded-xl border border-slate-200 text-slate-800">
             <AlertTriangle size={64} className="mb-4 text-red-400"/><h2 className="text-xl font-bold">Failed to load data.</h2>
             <button onClick={fetchInitialData} className="mt-4 px-6 py-2 bg-slate-900 text-white rounded-lg">Retry</button>
         </div>);
@@ -295,10 +296,10 @@ export default function ProductsModule() {
             <div className="bg-white p-6 border-b border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
                 <div>
                     <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2"><Package className="text-emerald-600"/> Products</h1>
-                    <p className="text-slate-500 text-sm font-bold mt-1">Select a category to view and manage products.</p>
+                    <p className="text-slate-800 text-sm font-bold mt-1">Select a category to view and manage products.</p>
                 </div>
                 <div className="relative w-full max-w-sm">
-                    <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
+                    <Search className="absolute left-3 top-2.5 text-slate-700" size={18}/>
                     <input type="text" value={catSearch} onChange={e => setCatSearch(e.target.value)} placeholder="Search category..." className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-sm text-slate-800"/>
                 </div>
             </div>
@@ -308,7 +309,7 @@ export default function ProductsModule() {
                         <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl font-black shadow-inner group-hover:scale-110 transition-transform">{i + 1}</div>
                         <h3 className="text-lg font-black text-slate-800 tracking-tight">{c.name}</h3>
                     </button>))}
-                    {filteredCategories.length === 0 && (<div className="col-span-full py-20 text-center text-slate-400 font-bold border-2 border-dashed border-slate-300 rounded-2xl bg-white">No categories found</div>)}
+                    {filteredCategories.length === 0 && (<div className="col-span-full py-20 text-center text-slate-700 font-bold border-2 border-dashed border-slate-300 rounded-2xl bg-white">No categories found</div>)}
                 </div>
             </div>
         </div>)}
@@ -317,17 +318,17 @@ export default function ProductsModule() {
         {viewState === 'detail' && (<div className="flex flex-col h-full relative">
             <div className="bg-white p-4 border-b border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 z-10">
                 <div className="flex items-center gap-4">
-                    <button onClick={handleBack} className="p-2.5 border border-slate-300 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition shadow-sm"><ArrowLeft size={20}/></button>
+                    <button onClick={handleBack} className="p-2.5 border border-slate-300 text-slate-800 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition shadow-sm"><ArrowLeft size={20}/></button>
                     <div>
                         <h1 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
                             <Package className="text-emerald-600"/> {selectedCategory?.name}
                         </h1>
-                        <p className="text-[11px] font-black text-slate-400 tracking-wider uppercase mt-0.5">{groupedProducts.length} products | {filteredProducts.length} variants</p>
+                        <p className="text-[11px] font-black text-slate-700 tracking-wider uppercase mt-0.5">{groupedProducts.length} products | {filteredProducts.length} variants</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="relative w-full max-w-sm">
-                        <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
+                        <Search className="absolute left-3 top-2.5 text-slate-700" size={18}/>
                         <input type="text" value={prodSearch} onChange={e => setProdSearch(e.target.value)} placeholder="Search products..." className="w-full pl-10 pr-4 py-2 bg-slate-100 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-sm text-slate-800"/>
                     </div>
                     <button onClick={openAddModal} className="h-10 px-4 bg-teal-600 text-white rounded-lg hover:bg-teal-500 transition flex items-center gap-2 shadow-sm font-bold text-sm shrink-0">
@@ -338,10 +339,10 @@ export default function ProductsModule() {
 
             <div className="flex-1 overflow-hidden relative bg-white">
                 <div className="h-full overflow-auto">
-                    {filteredProducts.length === 0 ? (<div className="flex flex-col items-center justify-center p-20 text-slate-400 font-bold text-center">
+                    {filteredProducts.length === 0 ? (<div className="flex flex-col items-center justify-center p-20 text-slate-700 font-bold text-center">
                         <Package size={48} className="mb-4 opacity-30"/><p>No products found. Click "Add Product" to create one.</p>
                     </div>) : (<table className="w-full text-left whitespace-nowrap text-sm border-collapse">
-                        <thead className="bg-slate-100 sticky top-0 z-10 text-[11px] uppercase tracking-widest text-slate-500 font-black shadow-sm">
+                        <thead className="bg-slate-100 sticky top-0 z-10 text-[11px] uppercase tracking-widest text-slate-800 font-black shadow-sm">
                             <tr>
                                 <th className="p-4 border-b border-slate-200">Product Name</th>
                                 <th className="p-4 border-b border-slate-200 w-52">Variant / Size</th>
@@ -350,7 +351,7 @@ export default function ProductsModule() {
                                 <th className="p-4 border-b border-slate-200 w-48 text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 font-medium">
+                        <tbody className="divide-y divide-slate-100 font-bold">
                             {groupedProducts.map(g => {
                                 const selected = g.variants[g.selectedIdx];
                                 const isEditing = editingVariant === selected.id;
@@ -360,7 +361,7 @@ export default function ProductsModule() {
                                             <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="border border-emerald-400 rounded-lg px-2 py-1 font-bold text-sm w-full outline-none focus:ring-2 focus:ring-emerald-500"/>
                                         ) : (
                                             <><span className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors text-base">{g.name}</span>
-                                            <span className="text-[10px] text-slate-400 font-bold ml-2">({g.variants.length} variant{g.variants.length > 1 ? 's' : ''})</span></>
+                                            <span className="text-[10px] text-slate-700 font-bold ml-2">({g.variants.length} variant{g.variants.length > 1 ? 's' : ''})</span></>
                                         )}
                                     </td>
                                     <td className="p-4">
@@ -369,13 +370,13 @@ export default function ProductsModule() {
                                                 {g.variants.map((v, i) => (<option key={v.id} value={i}>{v.quantityStr} — ₹{v.price.toFixed(0)}</option>))}
                                             </select>
                                             <ChevronDown size={16} className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-500 pointer-events-none"/>
-                                        </div>) : (<span className="font-bold text-slate-600 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 inline-block">{selected.quantityStr}</span>)}
+                                        </div>) : (<span className="font-bold text-slate-900 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 inline-block">{selected.quantityStr}</span>)}
                                     </td>
                                     <td className="p-4">
                                         {isEditing ? (
                                             <input type="text" value={editForm.sku} onChange={e => setEditForm({...editForm, sku: e.target.value})} className="border border-emerald-400 rounded-lg px-2 py-1 font-bold text-xs w-full outline-none"/>
                                         ) : (
-                                            <span className="text-xs font-bold text-slate-400">{selected.barcode}</span>
+                                            <span className="text-xs font-bold text-slate-700">{selected.barcode}</span>
                                         )}
                                     </td>
                                     <td className="p-4 text-right">
@@ -389,10 +390,10 @@ export default function ProductsModule() {
                                         <div className="flex items-center justify-center gap-2">
                                             {isEditing ? (<>
                                                 <button onClick={() => saveEdit(selected.id)} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-black uppercase flex items-center gap-1 hover:bg-emerald-500"><Save size={12}/> Save</button>
-                                                <button onClick={() => setEditingVariant(null)} className="px-3 py-1.5 bg-slate-200 text-slate-600 rounded-lg text-[11px] font-black uppercase hover:bg-slate-300">Cancel</button>
+                                                <button onClick={() => setEditingVariant(null)} className="px-3 py-1.5 bg-slate-200 text-slate-900 rounded-lg text-[11px] font-black uppercase hover:bg-slate-300">Cancel</button>
                                             </>) : (<>
-                                                <button onClick={() => startEdit(selected)} className="p-2 bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-lg transition" title="Edit"><Pencil size={14}/></button>
-                                                <button onClick={() => handleDelete(selected)} className="p-2 bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-lg transition" title="Delete"><Trash2 size={14}/></button>
+                                                <button onClick={() => startEdit(selected)} className="p-2 bg-slate-100 hover:bg-blue-50 text-slate-800 hover:text-blue-600 rounded-lg transition" title="Edit"><Pencil size={14}/></button>
+                                                <button onClick={() => handleDelete(selected)} className="p-2 bg-slate-100 hover:bg-red-50 text-slate-800 hover:text-red-600 rounded-lg transition" title="Delete"><Trash2 size={14}/></button>
                                                 <button onClick={() => handleAddToPosCart(selected)} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[11px] font-black uppercase flex items-center gap-1 hover:bg-emerald-500"><PlusCircle size={12}/> POS</button>
                                             </>)}
                                         </div>
@@ -408,14 +409,14 @@ export default function ProductsModule() {
             {addModalOpen && (<div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className="bg-white max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
                     <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative shrink-0">
-                        <button onClick={() => setAddModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition"><XCircle size={22}/></button>
+                        <button onClick={() => setAddModalOpen(false)} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
                         <div className="inline-flex p-3 rounded-full bg-teal-500/20 mb-3"><Package size={24} className="text-teal-400"/></div>
                         <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Add Product</h2>
-                        <p className="font-bold text-sm mt-1 text-slate-300">to {selectedCategory?.name}</p>
+                        <p className="font-bold text-sm mt-1 text-slate-900">to {selectedCategory?.name}</p>
                     </div>
                     <div className="p-6 bg-slate-50 flex-1 space-y-4 overflow-auto">
                         <div>
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Product Name *</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Product Name *</label>
                             <input type="text" value={addForm.name} onChange={e => setAddForm({...addForm, name: e.target.value})} placeholder="e.g., Basmati Rice" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                         </div>
 
@@ -423,11 +424,11 @@ export default function ProductsModule() {
                         {addVariants.length === 0 && (<>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Price (₹) *</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Price (₹) *</label>
                                     <input type="number" value={addForm.price} onChange={e => setAddForm({...addForm, price: e.target.value})} placeholder="99" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-black outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">SKU</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">SKU</label>
                                     <input type="text" value={addForm.sku} onChange={e => setAddForm({...addForm, sku: e.target.value})} placeholder="Optional" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                                 </div>
                             </div>
@@ -440,7 +441,7 @@ export default function ProductsModule() {
                                 <button onClick={addVariantRow} className="text-xs font-bold text-teal-600 hover:text-teal-500 flex items-center gap-1"><Plus size={14}/> Add Variant</button>
                             </div>
                             {addVariants.length === 0 ? (
-                                <p className="text-xs text-slate-400 font-bold">No variants. Product will be created as single item.</p>
+                                <p className="text-xs text-slate-700 font-bold">No variants. Product will be created as single item.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {addVariants.map((v, i) => (
@@ -455,7 +456,7 @@ export default function ProductsModule() {
                             )}
                         </div>
 
-                        <button onClick={submitAddProduct} disabled={addLoading} className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-teal-500/30 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
+                        <button onClick={submitAddProduct} disabled={addLoading} className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-teal-500/30 active:scale-[0.98] disabled:opacity-80 flex items-center justify-center gap-2">
                             {addLoading ? <span className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full"/> : <><PlusCircle size={16}/> Add to Vendure</>}
                         </button>
                     </div>

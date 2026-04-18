@@ -236,15 +236,15 @@ export default function LedgerModule() {
                 <div className="flex items-center gap-4">
                     <button onClick={goBack} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition"><ArrowLeft size={20}/></button>
                     <div>
-                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{selectedSupplier?.name}</p>
+                        <p className="text-slate-700 text-[10px] font-black uppercase tracking-widest">{selectedSupplier?.name}</p>
                         <h1 className="text-xl font-black text-white tracking-wide flex items-center gap-2"><Receipt size={20}/> {selectedInvoice.invoiceNumber}</h1>
                         <div className="flex items-center gap-3 mt-1">
-                            <span className="text-slate-400 text-xs font-bold">{new Date(selectedInvoice.invoiceDate).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>
-                            <span className="text-slate-600">|</span>
-                            <span className="text-slate-400 text-xs font-bold">Credit: {selectedInvoice.creditDays} days</span>
+                            <span className="text-slate-700 text-xs font-bold">{new Date(selectedInvoice.invoiceDate).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>
+                            <span className="text-slate-900">|</span>
+                            <span className="text-slate-700 text-xs font-bold">Credit: {selectedInvoice.creditDays} days</span>
                             {selectedInvoice.status !== 'FULLY_PAID' && (<>
-                                <span className="text-slate-600">|</span>
-                                <span className={`text-xs font-black px-2 py-0.5 rounded-full ${daysLeft <= 0 ? 'bg-red-500/20 text-red-400' : daysLeft <= 3 ? 'bg-orange-500/20 text-orange-400' : 'text-slate-400'}`}>
+                                <span className="text-slate-900">|</span>
+                                <span className={`text-xs font-black px-2 py-0.5 rounded-full ${daysLeft <= 0 ? 'bg-red-500/20 text-red-400' : daysLeft <= 3 ? 'bg-orange-500/20 text-orange-400' : 'text-slate-700'}`}>
                                     {daysLeft <= 0 ? `OVERDUE ${Math.abs(daysLeft)}d` : `${daysLeft}d remaining`}
                                 </span>
                             </>)}
@@ -281,8 +281,8 @@ export default function LedgerModule() {
                 {/* Progress Bar */}
                 <div className="mt-4">
                     <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Progress</span>
-                        <span className="text-xs font-black text-slate-600">{paidPct}%</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-700">Payment Progress</span>
+                        <span className="text-xs font-black text-slate-900">{paidPct}%</span>
                     </div>
                     <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                         <div className={`h-full rounded-full transition-all duration-700 ${paidPct >= 100 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : paidPct > 0 ? 'bg-gradient-to-r from-teal-500 to-teal-400' : 'bg-slate-200'}`} style={{ width: `${paidPct}%` }}/>
@@ -293,21 +293,21 @@ export default function LedgerModule() {
             {/* Payment History */}
             <div className="flex-1 overflow-auto p-6">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2"><FileText size={16}/> Payment History</h3>
-                    <span className="text-xs font-bold text-slate-400">{payments.length} payment{payments.length !== 1 ? 's' : ''}</span>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2"><FileText size={16}/> Payment History</h3>
+                    <span className="text-xs font-bold text-slate-700">{payments.length} payment{payments.length !== 1 ? 's' : ''}</span>
                 </div>
                 {payments.length === 0 ? (
                     <div className="bg-white rounded-xl border border-slate-200 p-16 text-center">
-                        <Receipt size={40} className="text-slate-300 mx-auto mb-3"/>
-                        <p className="text-lg font-bold text-slate-400">No payments yet</p>
-                        <p className="text-sm text-slate-300 mt-1">Click "Add Payment" to record a payment</p>
+                        <Receipt size={40} className="text-slate-900 mx-auto mb-3"/>
+                        <p className="text-lg font-bold text-slate-700">No payments yet</p>
+                        <p className="text-sm text-slate-900 mt-1">Click "Add Payment" to record a payment</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
                         {payments.map((p, i) => (
                             <div key={p.id} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-500">#{payments.length - i}</div>
+                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-sm font-black text-slate-800">#{payments.length - i}</div>
                                     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-black uppercase tracking-wider ${paymentModeColor(p.paymentMode)}`}>
                                         <PaymentModeIcon mode={p.paymentMode} size={14}/> {paymentModeLabel(p.paymentMode)}
                                     </div>
@@ -346,9 +346,9 @@ export default function LedgerModule() {
                     <div>
                         <h1 className="text-xl font-black text-white tracking-wide">{selectedSupplier.name}</h1>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
-                            <span className="text-slate-400 text-xs font-bold flex items-center gap-1"><Phone size={10}/> {selectedSupplier.contactNumber}</span>
-                            {selectedSupplier.gstNumber && <><span className="text-slate-600">|</span><span className="text-slate-400 text-xs font-bold flex items-center gap-1"><Building2 size={10}/> GST: {selectedSupplier.gstNumber}</span></>}
-                            {selectedSupplier.address && <><span className="text-slate-600">|</span><span className="text-slate-400 text-xs font-bold flex items-center gap-1"><MapPin size={10}/> {selectedSupplier.address}</span></>}
+                            <span className="text-slate-700 text-xs font-bold flex items-center gap-1"><Phone size={10}/> {selectedSupplier.contactNumber}</span>
+                            {selectedSupplier.gstNumber && <><span className="text-slate-900">|</span><span className="text-slate-700 text-xs font-bold flex items-center gap-1"><Building2 size={10}/> GST: {selectedSupplier.gstNumber}</span></>}
+                            {selectedSupplier.address && <><span className="text-slate-900">|</span><span className="text-slate-700 text-xs font-bold flex items-center gap-1"><MapPin size={10}/> {selectedSupplier.address}</span></>}
                         </div>
                     </div>
                 </div>
@@ -376,12 +376,12 @@ export default function LedgerModule() {
 
             {/* Invoice List */}
             <div className="flex-1 overflow-auto p-6">
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2 mb-4"><FileText size={16}/> Invoices</h3>
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-800 flex items-center gap-2 mb-4"><FileText size={16}/> Invoices</h3>
                 {supplierInvoices.length === 0 ? (
                     <div className="bg-white rounded-xl border border-slate-200 p-16 text-center">
-                        <Receipt size={40} className="text-slate-300 mx-auto mb-3"/>
-                        <p className="text-lg font-bold text-slate-400">No invoices yet</p>
-                        <p className="text-sm text-slate-300 mt-1">Click "Add Invoice" to create the first invoice</p>
+                        <Receipt size={40} className="text-slate-900 mx-auto mb-3"/>
+                        <p className="text-lg font-bold text-slate-700">No invoices yet</p>
+                        <p className="text-sm text-slate-900 mt-1">Click "Add Invoice" to create the first invoice</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
@@ -393,14 +393,14 @@ export default function LedgerModule() {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4">
                                             <div className="w-12 h-12 rounded-xl bg-slate-100 group-hover:bg-teal-50 flex items-center justify-center transition">
-                                                <Receipt size={22} className="text-slate-400 group-hover:text-teal-600 transition"/>
+                                                <Receipt size={22} className="text-slate-700 group-hover:text-teal-600 transition"/>
                                             </div>
                                             <div>
                                                 <h4 className="font-black text-slate-800 group-hover:text-teal-700 transition">{inv.invoiceNumber}</h4>
                                                 <div className="flex items-center gap-3 mt-0.5">
-                                                    <span className="text-xs text-slate-400 font-bold">{new Date(inv.invoiceDate).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>
-                                                    <span className="text-slate-300">|</span>
-                                                    <span className="text-xs text-slate-400 font-bold">{inv.creditDays}d credit</span>
+                                                    <span className="text-xs text-slate-700 font-bold">{new Date(inv.invoiceDate).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>
+                                                    <span className="text-slate-900">|</span>
+                                                    <span className="text-xs text-slate-700 font-bold">{inv.creditDays}d credit</span>
                                                     {inv.status !== 'FULLY_PAID' && dLeft <= 0 && <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-black uppercase">OVERDUE</span>}
                                                     {inv.status !== 'FULLY_PAID' && dLeft > 0 && dLeft <= 3 && <span className="px-2 py-0.5 rounded-full bg-orange-500 text-white text-[9px] font-black uppercase">{dLeft}d LEFT</span>}
                                                 </div>
@@ -416,9 +416,9 @@ export default function LedgerModule() {
                                                 <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                                                     <div className={`h-full rounded-full ${paidPct >= 100 ? 'bg-emerald-500' : 'bg-teal-500'}`} style={{ width: `${paidPct}%` }}/>
                                                 </div>
-                                                <span className="text-[10px] font-black text-slate-400">{paidPct}%</span>
+                                                <span className="text-[10px] font-black text-slate-700">{paidPct}%</span>
                                             </div>
-                                            <ChevronRight size={20} className="text-slate-300 group-hover:text-teal-500 transition"/>
+                                            <ChevronRight size={20} className="text-slate-900 group-hover:text-teal-500 transition"/>
                                         </div>
                                     </div>
                                 </div>
@@ -433,29 +433,29 @@ export default function LedgerModule() {
                 <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden">
                         <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative">
-                            <button onClick={() => setAddInvoiceOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition"><XCircle size={22}/></button>
+                            <button onClick={() => setAddInvoiceOpen(false)} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
                             <div className="inline-flex p-3 rounded-full bg-teal-500/20 mb-3"><Receipt size={24} className="text-teal-400"/></div>
                             <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Add Invoice</h2>
-                            <p className="font-bold text-sm mt-1 text-slate-300">{selectedSupplier.name}</p>
-                            {selectedSupplier.gstNumber && <p className="text-xs text-slate-400 mt-0.5">GST: {selectedSupplier.gstNumber}</p>}
+                            <p className="font-bold text-sm mt-1 text-slate-900">{selectedSupplier.name}</p>
+                            {selectedSupplier.gstNumber && <p className="text-xs text-slate-700 mt-0.5">GST: {selectedSupplier.gstNumber}</p>}
                         </div>
                         <div className="p-6 bg-slate-50 space-y-4">
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Invoice Number *</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Invoice Number *</label>
                                 <input type="text" value={invoiceForm.invoiceNumber} onChange={e => setInvoiceForm({...invoiceForm, invoiceNumber: e.target.value})} placeholder="Supplier's invoice number" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Amount (₹) *</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Amount (₹) *</label>
                                     <input type="number" value={invoiceForm.amount} onChange={e => setInvoiceForm({...invoiceForm, amount: e.target.value})} placeholder="25000" className="w-full border border-slate-300 rounded-xl p-3.5 text-lg font-black outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Credit Days</label>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Credit Days</label>
                                     <input type="number" value={invoiceForm.creditDays} onChange={e => setInvoiceForm({...invoiceForm, creditDays: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3.5 text-lg font-black outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                                 </div>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Invoice Date</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Invoice Date</label>
                                 <input type="date" value={invoiceForm.date} onChange={e => setInvoiceForm({...invoiceForm, date: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                             </div>
                             <button onClick={submitNewInvoice} className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-teal-500/30 active:scale-[0.98]">
@@ -475,33 +475,33 @@ export default function LedgerModule() {
         return (<div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative">
-                    <button onClick={() => setPayModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition"><XCircle size={22}/></button>
+                    <button onClick={() => setPayModalOpen(false)} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
                     <div className="inline-flex p-3 rounded-full bg-teal-500/20 mb-3"><IndianRupee size={24} className="text-teal-400"/></div>
                     <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Add Payment</h2>
-                    <p className="font-bold text-sm mt-1 text-slate-300">{selectedInvoice?.invoiceNumber}</p>
+                    <p className="font-bold text-sm mt-1 text-slate-900">{selectedInvoice?.invoiceNumber}</p>
                 </div>
                 <div className="p-6 bg-slate-50 space-y-4">
                     <div className="flex justify-between bg-white p-3 rounded-xl border border-slate-200">
-                        <div><span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Total</span><span className="text-sm font-bold text-slate-700">₹{selectedInvoice?.amount?.toLocaleString()}</span></div>
+                        <div><span className="text-[10px] font-black uppercase tracking-widest text-slate-700 block">Total</span><span className="text-sm font-bold text-slate-700">₹{selectedInvoice?.amount?.toLocaleString()}</span></div>
                         <div className="text-right"><span className="text-[10px] font-black uppercase tracking-widest text-red-400 block">Balance</span><span className="text-sm font-black text-red-600">₹{selectedInvoice?.balance?.toLocaleString()}</span></div>
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Payment Amount (₹)</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Payment Amount (₹)</label>
                         <input type="number" value={payForm.amount} onChange={e => setPayForm({...payForm, amount: e.target.value})} max={selectedInvoice?.balance} min="1" className="w-full border border-slate-300 rounded-xl p-3.5 text-lg font-black outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                     </div>
                     <div>
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Payment Method</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Payment Method</label>
                         <div className="grid grid-cols-4 gap-2">
                             {['CASH','UPI','BANK','CREDIT'].map(mode => (
-                                <button key={mode} onClick={() => setPayForm({...payForm, mode})} className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-black uppercase tracking-wider ${payForm.mode === mode ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 bg-white text-slate-400 hover:border-slate-300'}`}>
+                                <button key={mode} onClick={() => setPayForm({...payForm, mode})} className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-black uppercase tracking-wider ${payForm.mode === mode ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}>
                                     <PaymentModeIcon mode={mode} size={20}/>{mode === 'BANK' ? 'Bank' : mode === 'CREDIT' ? 'Card' : mode}
                                 </button>
                             ))}
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                        <div><label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Date</label><input type="date" value={payForm.date} onChange={e => setPayForm({...payForm, date: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/></div>
-                        <div><label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Time</label><input type="time" value={payForm.time} onChange={e => setPayForm({...payForm, time: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/></div>
+                        <div><label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Date</label><input type="date" value={payForm.date} onChange={e => setPayForm({...payForm, date: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/></div>
+                        <div><label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Time</label><input type="time" value={payForm.time} onChange={e => setPayForm({...payForm, time: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/></div>
                     </div>
                     <button onClick={submitPayment} className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-teal-500/30 active:scale-[0.98]">Confirm Payment</button>
                 </div>
@@ -518,13 +518,13 @@ export default function LedgerModule() {
       {/* Summary Cards */}
       <div className="p-6 bg-white border-b border-slate-200 shadow-sm shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-4 z-10">
         <div className="bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-4 right-4 text-emerald-500 opacity-20 group-hover:opacity-100 transition-opacity"><ArrowUpRight size={32}/></div>
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Sales</p>
+          <div className="absolute top-4 right-4 text-emerald-500 opacity-50 group-hover:opacity-100 transition-opacity"><ArrowUpRight size={32}/></div>
+          <p className="text-[11px] font-black uppercase tracking-widest text-slate-700 mb-1">Total Sales</p>
           <h3 className="text-2xl font-black text-slate-800 tracking-tight">₹{summary.totalSales.toLocaleString()}</h3>
         </div>
         <div className="bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-4 right-4 text-red-400 opacity-20 group-hover:opacity-100 transition-opacity"><ArrowDownRight size={32}/></div>
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Purchase</p>
+          <div className="absolute top-4 right-4 text-red-400 opacity-50 group-hover:opacity-100 transition-opacity"><ArrowDownRight size={32}/></div>
+          <p className="text-[11px] font-black uppercase tracking-widest text-slate-700 mb-1">Total Purchase</p>
           <h3 className="text-2xl font-black text-slate-800 tracking-tight">₹{summary.totalPurchase.toLocaleString()}</h3>
         </div>
         <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-4 rounded-xl border border-emerald-200 shadow-sm">
@@ -540,16 +540,16 @@ export default function LedgerModule() {
       {/* Tabs + Search */}
       <div className="px-6 py-4 bg-white border-b border-slate-200 shrink-0 flex flex-col md:flex-row justify-between items-center gap-4 z-10">
         <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 h-10 w-full md:w-auto">
-          <button onClick={() => { setActiveTab('CUSTOMER'); setView('list'); }} className={`flex-1 md:w-48 text-xs font-black uppercase tracking-widest transition-all rounded-md flex justify-center items-center gap-2 ${activeTab === 'CUSTOMER' ? 'bg-white shadow-sm text-emerald-600 border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
+          <button onClick={() => { setActiveTab('CUSTOMER'); setView('list'); }} className={`flex-1 md:w-48 text-xs font-black uppercase tracking-widest transition-all rounded-md flex justify-center items-center gap-2 ${activeTab === 'CUSTOMER' ? 'bg-white shadow-sm text-emerald-600 border border-slate-200' : 'text-slate-700 hover:text-slate-900'}`}>
             <Activity size={14}/> Customer Ledger
           </button>
-          <button onClick={() => { setActiveTab('SUPPLIER'); setView('list'); }} className={`flex-1 md:w-48 text-xs font-black uppercase tracking-widest transition-all rounded-md flex justify-center items-center gap-2 ${activeTab === 'SUPPLIER' ? 'bg-slate-800 shadow-sm text-white' : 'text-slate-400 hover:text-slate-600'}`}>
+          <button onClick={() => { setActiveTab('SUPPLIER'); setView('list'); }} className={`flex-1 md:w-48 text-xs font-black uppercase tracking-widest transition-all rounded-md flex justify-center items-center gap-2 ${activeTab === 'SUPPLIER' ? 'bg-slate-800 shadow-sm text-white' : 'text-slate-700 hover:text-slate-900'}`}>
             <CreditCard size={14}/> Supplier Ledger
           </button>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+            <Search className="absolute left-3 top-2.5 text-slate-700" size={16}/>
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder={activeTab === 'SUPPLIER' ? "Search supplier, phone, GST..." : "Search name, invoice..."} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none font-bold"/>
           </div>
           <button onClick={exportCSV} className="h-10 px-4 border-2 border-slate-800 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition flex items-center gap-2 shadow-sm font-bold text-sm">
@@ -569,9 +569,9 @@ export default function LedgerModule() {
           /* ── SUPPLIER CARDS ── */
           filteredSuppliers.length === 0 ? (
             <div className="bg-white rounded-xl border border-slate-200 p-16 text-center">
-              <User size={40} className="text-slate-300 mx-auto mb-3"/>
-              <p className="text-lg font-bold text-slate-400">No suppliers yet</p>
-              <p className="text-sm text-slate-300 mt-1">Click "Add Supplier" to get started</p>
+              <User size={40} className="text-slate-900 mx-auto mb-3"/>
+              <p className="text-lg font-bold text-slate-700">No suppliers yet</p>
+              <p className="text-sm text-slate-900 mt-1">Click "Add Supplier" to get started</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -584,24 +584,24 @@ export default function LedgerModule() {
                       </div>
                       <div>
                         <h4 className="font-black text-slate-800 group-hover:text-teal-700 transition">{s.name}</h4>
-                        <span className="text-xs text-slate-400 font-bold flex items-center gap-1"><Phone size={10}/> {s.contactNumber}</span>
+                        <span className="text-xs text-slate-700 font-bold flex items-center gap-1"><Phone size={10}/> {s.contactNumber}</span>
                       </div>
                     </div>
-                    <ChevronRight size={20} className="text-slate-300 group-hover:text-teal-500 transition mt-1"/>
+                    <ChevronRight size={20} className="text-slate-900 group-hover:text-teal-500 transition mt-1"/>
                   </div>
-                  {s.gstNumber && <p className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1"><Building2 size={10}/> GST: {s.gstNumber}</p>}
-                  {s.address && <p className="text-[10px] font-bold text-slate-400 mb-3 flex items-center gap-1 truncate"><MapPin size={10}/> {s.address}</p>}
+                  {s.gstNumber && <p className="text-[10px] font-bold text-slate-700 mb-1 flex items-center gap-1"><Building2 size={10}/> GST: {s.gstNumber}</p>}
+                  {s.address && <p className="text-[10px] font-bold text-slate-700 mb-3 flex items-center gap-1 truncate"><MapPin size={10}/> {s.address}</p>}
                   <div className="border-t border-slate-100 pt-3 grid grid-cols-3 gap-2 text-center">
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Invoices</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-700">Invoices</p>
                       <p className="text-lg font-black text-slate-800">{s.invoices.length}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-700">Total</p>
                       <p className="text-sm font-black text-slate-700">₹{s.totalAmount.toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Balance</p>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-700">Balance</p>
                       <p className={`text-sm font-black ${s.totalBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>₹{s.totalBalance.toLocaleString()}</p>
                     </div>
                   </div>
@@ -615,19 +615,19 @@ export default function LedgerModule() {
             <table className="w-full text-left whitespace-nowrap text-sm border-collapse">
               <thead className="bg-[#f8fafc] sticky top-0 z-10 border-b border-slate-200">
                 <tr>
-                  <th className="p-4 px-6 text-xs uppercase font-black tracking-widest text-slate-400">Customer</th>
-                  <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400">Invoice</th>
-                  <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400">Status</th>
-                  <th className="p-4 text-right text-xs uppercase font-black tracking-widest text-slate-400">Amount</th>
-                  <th className="p-4 text-right text-xs uppercase font-black tracking-widest text-slate-400">Paid</th>
-                  <th className="p-4 text-right text-xs uppercase font-black tracking-widest text-slate-400">Balance</th>
+                  <th className="p-4 px-6 text-xs uppercase font-black tracking-widest text-slate-700">Customer</th>
+                  <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700">Invoice</th>
+                  <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700">Status</th>
+                  <th className="p-4 text-right text-xs uppercase font-black tracking-widest text-slate-700">Amount</th>
+                  <th className="p-4 text-right text-xs uppercase font-black tracking-widest text-slate-700">Paid</th>
+                  <th className="p-4 text-right text-xs uppercase font-black tracking-widest text-slate-700">Balance</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredCustomerLedgers.map(l => (
                   <tr key={l.id} className="hover:bg-teal-50/30 transition-colors">
                     <td className="p-4 px-6"><p className="font-bold text-slate-800">{l.partyName}</p></td>
-                    <td className="p-4"><p className="font-bold text-slate-700">{l.invoiceNumber}</p><p className="text-xs text-slate-400">{new Date(l.invoiceDate).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</p></td>
+                    <td className="p-4"><p className="font-bold text-slate-700">{l.invoiceNumber}</p><p className="text-xs text-slate-700">{new Date(l.invoiceDate).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</p></td>
                     <td className="p-4">
                       {l.status === 'FULLY_PAID' && <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase border border-emerald-200"><CheckCircle size={12}/> Paid</span>}
                       {l.status === 'PARTIALLY_PAID' && <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-[10px] font-black uppercase border border-orange-200"><Clock size={12}/> Partial</span>}
@@ -635,10 +635,10 @@ export default function LedgerModule() {
                     </td>
                     <td className="p-4 text-right font-black text-slate-800">₹{l.amount.toLocaleString()}</td>
                     <td className="p-4 text-right font-black text-emerald-600">₹{l.paidAmount.toLocaleString()}</td>
-                    <td className="p-4 text-right">{l.balance === 0 ? <span className="text-slate-300 font-bold">₹0</span> : <span className="font-black text-red-600">₹{l.balance.toLocaleString()}</span>}</td>
+                    <td className="p-4 text-right">{l.balance === 0 ? <span className="text-slate-900 font-bold">₹0</span> : <span className="font-black text-red-600">₹{l.balance.toLocaleString()}</span>}</td>
                   </tr>
                 ))}
-                {filteredCustomerLedgers.length === 0 && <tr><td colSpan={6} className="py-20 text-center text-slate-400 font-bold">No entries found.</td></tr>}
+                {filteredCustomerLedgers.length === 0 && <tr><td colSpan={6} className="py-20 text-center text-slate-700 font-bold">No entries found.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -660,14 +660,14 @@ export default function LedgerModule() {
               const dl = new Date(a.invoiceDate); dl.setDate(dl.getDate() + a.creditDays);
               return (
                 <div key={a.id} className={`p-4 rounded-xl border shadow-sm relative ${dLeft <= 0 ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}`}>
-                  <button onClick={() => setDismissedAlerts(p => [...p, a.id])} className="absolute top-2 right-2 text-slate-300 hover:text-slate-500"><XCircle size={14}/></button>
+                  <button onClick={() => setDismissedAlerts(p => [...p, a.id])} className="absolute top-2 right-2 text-slate-900 hover:text-slate-800"><XCircle size={14}/></button>
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase mb-2 ${dLeft <= 0 ? 'bg-red-500 text-white' : 'bg-orange-500 text-white'}`}>
                     <AlertTriangle size={9}/> {dLeft <= 0 ? `OVERDUE ${Math.abs(dLeft)}d` : `${dLeft}d LEFT`}
                   </span>
                   <p className="font-black text-slate-800 text-sm">{a.partyName}</p>
-                  <p className="text-[10px] font-bold text-slate-400">{a.invoiceNumber}</p>
+                  <p className="text-[10px] font-bold text-slate-700">{a.invoiceNumber}</p>
                   <div className="flex justify-between mt-2">
-                    <span className="text-xs font-bold text-slate-500">{dl.toLocaleDateString('en-IN', { day:'2-digit', month:'short' })}</span>
+                    <span className="text-xs font-bold text-slate-800">{dl.toLocaleDateString('en-IN', { day:'2-digit', month:'short' })}</span>
                     <span className={`text-sm font-black ${dLeft <= 0 ? 'text-red-600' : 'text-orange-600'}`}>₹{a.balance.toLocaleString()}</span>
                   </div>
                 </div>
@@ -682,25 +682,25 @@ export default function LedgerModule() {
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden">
             <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative">
-              <button onClick={() => setAddSupplierOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition"><XCircle size={22}/></button>
+              <button onClick={() => setAddSupplierOpen(false)} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
               <div className="inline-flex p-3 rounded-full bg-teal-500/20 mb-3"><User size={24} className="text-teal-400"/></div>
               <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Create Supplier</h2>
             </div>
             <div className="p-6 bg-slate-50 space-y-4">
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Supplier Name *</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Supplier Name *</label>
                 <input type="text" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} placeholder="e.g., Karthi Traders" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Mobile Number *</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Mobile Number *</label>
                 <input type="tel" value={supplierForm.contact} onChange={e => setSupplierForm({...supplierForm, contact: e.target.value})} placeholder="e.g., 9876543210" maxLength={15} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Default GST Number</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Default GST Number</label>
                 <input type="text" value={supplierForm.gst} onChange={e => setSupplierForm({...supplierForm, gst: e.target.value.toUpperCase()})} placeholder="e.g., 33AABCT1332L1ZZ" maxLength={15} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Address</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Address</label>
                 <textarea value={supplierForm.address} onChange={e => setSupplierForm({...supplierForm, address: e.target.value})} placeholder="e.g., 12, Anna Nagar, Chennai" rows={2} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white resize-none"/>
               </div>
               <button onClick={submitNewSupplier} className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-teal-500/30 active:scale-[0.98]">

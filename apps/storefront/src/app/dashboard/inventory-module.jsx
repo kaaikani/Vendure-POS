@@ -18,7 +18,7 @@ export default function InventoryModule() {
           <Package className="text-emerald-600"/> Inventory Management
         </h2>
         <div className="flex gap-2">
-           <button className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 rounded text-sm font-bold text-slate-600 hover:bg-slate-50">
+           <button className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 rounded text-sm font-bold text-slate-900 hover:bg-slate-50">
              <Download size={16}/> Export
            </button>
         </div>
@@ -28,7 +28,7 @@ export default function InventoryModule() {
       <div className="flex overflow-x-auto border-b border-slate-200 bg-white px-2 scrollbar-hide">
         {TABS.map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === tab
                 ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}>
+                : 'border-transparent text-slate-800 hover:text-slate-800 hover:bg-slate-50'}`}>
             {tab}
           </button>))}
       </div>
@@ -66,7 +66,7 @@ function OverviewTab() {
               <s.icon size={24} className={s.color}/>
             </div>
             <div>
-              <div className="text-sm font-bold text-slate-500">{s.title}</div>
+              <div className="text-sm font-bold text-slate-800">{s.title}</div>
               <div className="text-2xl font-black text-slate-800">{s.val}</div>
             </div>
           </div>))}
@@ -82,9 +82,9 @@ function OverviewTab() {
                 <div className="mt-1 p-1.5 bg-emerald-100 rounded text-emerald-700"><ArrowDownRight size={14}/></div>
                 <div>
                   <div className="text-sm font-bold text-slate-700">Stock Received: PO-1029</div>
-                  <div className="text-xs text-slate-500">+150 units of Organic Atta (5kg) added to Main Warehouse</div>
+                  <div className="text-xs text-slate-800">+150 units of Organic Atta (5kg) added to Main Warehouse</div>
                 </div>
-                <div className="ml-auto text-xs font-mono text-slate-400">10m ago</div>
+                <div className="ml-auto text-xs font-mono text-slate-700">10m ago</div>
               </div>))}
           </div>
         </div>
@@ -100,7 +100,7 @@ function OverviewTab() {
             { n: 'Tata Salt 1kg', cur: 40, min: 100 },
         ].map((item, i) => (<div key={i} className="flex justify-between items-center bg-amber-50/50 p-3 rounded border border-amber-100">
                   <div className="text-sm font-bold text-slate-700">{item.n}</div>
-                  <div className="text-xs font-medium">
+                  <div className="text-xs font-bold">
                      <span className="text-red-600 font-bold">{item.cur}</span> / {item.min} min
                   </div>
                </div>))}
@@ -160,11 +160,11 @@ function ProductsTab() {
     return (<div className="bg-white rounded border border-slate-200 shadow-sm h-full flex flex-col">
       <div className="p-4 border-b border-slate-200 flex justify-between items-center gap-4">
          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-2.5 text-slate-400" size={18}/>
+            <Search className="absolute left-3 top-2.5 text-slate-700" size={18}/>
             <input placeholder="Search by name, SKU, barcode..." className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"/>
          </div>
          <div className="flex gap-2">
-            <button className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg flex items-center gap-2 text-sm font-medium"><Filter size={16}/> Filter</button>
+            <button className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-lg flex items-center gap-2 text-sm font-bold"><Filter size={16}/> Filter</button>
             <button onClick={() => setShowAdd(!showAdd)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 text-sm font-bold shadow-sm"><PlusCircle size={16}/> Add Item</button>
          </div>
       </div>
@@ -179,7 +179,7 @@ function ProductsTab() {
 
       <div className="flex-1 overflow-auto">
         <table className="w-full text-left">
-          <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase">
+          <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-xs font-bold text-slate-800 uppercase">
             <tr>
               <th className="p-4">Item Details</th>
               <th className="p-4">SKU / Barcode</th>
@@ -196,10 +196,10 @@ function ProductsTab() {
             return (<tr key={p.id} className="hover:bg-slate-50">
                     <td className="p-4">
                        <div className="font-bold text-sm text-slate-800">{p.name}</div>
-                       <div className="text-xs text-slate-500">Unit: Pcs</div>
+                       <div className="text-xs text-slate-800">Unit: Pcs</div>
                     </td>
-                    <td className="p-4 text-sm font-mono text-slate-600">{variant.sku}</td>
-                    <td className="p-4 text-sm text-slate-600">Groceries</td>
+                    <td className="p-4 text-sm font-mono text-slate-900">{variant.sku}</td>
+                    <td className="p-4 text-sm text-slate-900">Groceries</td>
                     <td className="p-4 text-sm font-bold text-slate-800 text-right">₹{(variant.price / 100 || 0).toFixed(2)}</td>
                     <td className="p-4 text-center">
                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${variant.stockOnHand > 10 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
@@ -208,7 +208,7 @@ function ProductsTab() {
                     </td>
                     <td className="p-4 text-center"><span className="text-emerald-500"><CheckCircle size={16} className="mx-auto"/></span></td>
                     <td className="p-4 text-right">
-                       <button className="p-1.5 text-slate-400 hover:text-blue-600"><Edit size={16}/></button>
+                       <button className="p-1.5 text-slate-700 hover:text-blue-600"><Edit size={16}/></button>
                     </td>
                  </tr>);
         })}
@@ -224,7 +224,7 @@ function StockLevelsTab() {
     ];
     return <GenericTable title="Real-time Stock Levels" cols={['Item', 'Location', 'Available', 'Reserved', 'Damaged', 'Status']} data={data} renderRow={(row, i) => (<tr key={i} className="border-b">
          <td className="p-3 text-sm font-bold text-slate-700">{row.name}</td>
-         <td className="p-3 text-sm text-slate-500">{row.loc}</td>
+         <td className="p-3 text-sm text-slate-800">{row.loc}</td>
          <td className="p-3 font-bold">{row.cur}</td>
          <td className="p-3 text-amber-600">{row.rsv}</td>
          <td className="p-3 text-red-500">{row.dmg}</td>
@@ -257,9 +257,9 @@ function ReportsTab() {
 }
 function Placeholder({ icon: Icon, title, desc }) {
     return (<div className="h-full flex flex-col items-center justify-center p-8 bg-white rounded border border-slate-200 border-dashed text-center">
-       <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100"><Icon size={40} className="text-slate-300"/></div>
+       <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100"><Icon size={40} className="text-slate-900"/></div>
        <h3 className="text-xl font-bold text-slate-700 mb-2">{title}</h3>
-       <p className="text-slate-500 max-w-md">{desc}</p>
+       <p className="text-slate-800 max-w-md">{desc}</p>
        <button className="mt-6 px-4 py-2 bg-slate-900 text-white font-bold rounded shadow-sm text-sm">Configure Module</button>
     </div>);
 }
@@ -267,7 +267,7 @@ function GenericTable({ title, cols, data, renderRow }) {
     return (<div className="bg-white rounded border border-slate-200 flex flex-col h-full">
         <div className="p-4 border-b border-slate-200 font-bold text-slate-800">{title}</div>
         <table className="w-full text-left">
-           <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase">
+           <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-800 uppercase">
              <tr>{cols.map((c) => <th key={c} className="p-3">{c}</th>)}</tr>
            </thead>
            <tbody>{data.map(renderRow)}</tbody>

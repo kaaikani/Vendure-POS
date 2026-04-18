@@ -1,6 +1,11 @@
 "use client";
 import React, { useState, useEffect, Suspense } from 'react';
-import { BarChart, BookOpen, Grid, Box, ShoppingBag, ScanLine, FileText, LogOut, Users, ShieldCheck, User, Plus, XCircle, Trash2, ToggleLeft, ToggleRight, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { BarChart, BookOpen, Grid, Box, ShoppingBag, ScanLine, FileText, LogOut, Users, ShieldCheck, User, Plus, XCircle, Trash2, ToggleLeft, ToggleRight, Eye, EyeOff, KeyRound, Package, ShoppingCart, Hash, Wallet, Receipt, Settings, ClipboardList } from 'lucide-react';
+import ItemMasterModule from './item-master-module';
+import PurchaseModule from './purchase-module';
+import PaymentModule from './payment-module';
+import ReceiptModule from './receipt-module';
+import TokenEntryModule from './token-entry-module';
 import InventoryModule from './inventory-module';
 import LedgerModule from './ledger-module';
 import ProductsModule from './category-module';
@@ -79,7 +84,7 @@ function UserManagementModule() {
             <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 shrink-0 flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-black text-white tracking-wide flex items-center gap-2"><Users size={22}/> User Management</h1>
-                    <p className="text-slate-400 text-xs font-bold mt-1">Create and manage POS users</p>
+                    <p className="text-slate-700 text-xs font-bold mt-1">Create and manage POS users</p>
                 </div>
                 <button onClick={() => { setForm({ username: '', password: '', displayName: '', role: 'user' }); setAddOpen(true); }} className="flex items-center gap-2 px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-white rounded-xl font-black text-sm uppercase tracking-widest transition shadow-lg shadow-teal-500/30 active:scale-95">
                     <Plus size={18}/> Create User
@@ -89,17 +94,17 @@ function UserManagementModule() {
             {/* Users Table */}
             <div className="flex-1 overflow-auto p-6">
                 {loading ? (
-                    <div className="flex items-center justify-center h-64 text-slate-400">Loading...</div>
+                    <div className="flex items-center justify-center h-64 text-slate-700">Loading...</div>
                 ) : (
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                         <table className="w-full text-left text-sm">
                             <thead className="bg-[#f8fafc] border-b border-slate-200">
                                 <tr>
-                                    <th className="p-4 px-6 text-xs uppercase font-black tracking-widest text-slate-400">User</th>
-                                    <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400">Role</th>
-                                    <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400">Status</th>
-                                    <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400">Created</th>
-                                    <th className="p-4 text-center text-xs uppercase font-black tracking-widest text-slate-400">Actions</th>
+                                    <th className="p-4 px-6 text-xs uppercase font-black tracking-widest text-slate-700">User</th>
+                                    <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700">Role</th>
+                                    <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700">Status</th>
+                                    <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700">Created</th>
+                                    <th className="p-4 text-center text-xs uppercase font-black tracking-widest text-slate-700">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -112,7 +117,7 @@ function UserManagementModule() {
                                                 </div>
                                                 <div>
                                                     <p className="font-black text-slate-800">{u.displayName}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400">@{u.username}</p>
+                                                    <p className="text-[10px] font-bold text-slate-700">@{u.username}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -128,21 +133,21 @@ function UserManagementModule() {
                                                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-red-50 text-red-700 text-[10px] font-black uppercase border border-red-200">Disabled</span>
                                             )}
                                         </td>
-                                        <td className="p-4 text-sm text-slate-500 font-bold">
+                                        <td className="p-4 text-sm text-slate-800 font-bold">
                                             {new Date(u.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                         </td>
                                         <td className="p-4">
                                             {u.role !== 'admin' ? (
                                                 <div className="flex items-center justify-center gap-2">
-                                                    <button onClick={() => { setResetPassOpen(u.id); setNewPass(''); }} className="p-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition" title="Reset Password"><KeyRound size={16}/></button>
-                                                    <button onClick={() => handleToggleActive(u)} className="p-2 rounded-lg bg-slate-100 hover:bg-amber-50 text-slate-500 hover:text-amber-600 transition" title={u.active ? 'Disable' : 'Enable'}>
+                                                    <button onClick={() => { setResetPassOpen(u.id); setNewPass(''); }} className="p-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-800 hover:text-blue-600 transition" title="Reset Password"><KeyRound size={16}/></button>
+                                                    <button onClick={() => handleToggleActive(u)} className="p-2 rounded-lg bg-slate-100 hover:bg-amber-50 text-slate-800 hover:text-amber-600 transition" title={u.active ? 'Disable' : 'Enable'}>
                                                         {u.active ? <ToggleRight size={16}/> : <ToggleLeft size={16}/>}
                                                     </button>
-                                                    <button onClick={() => handleDelete(u)} className="p-2 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 transition" title="Delete"><Trash2 size={16}/></button>
+                                                    <button onClick={() => handleDelete(u)} className="p-2 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-800 hover:text-red-600 transition" title="Delete"><Trash2 size={16}/></button>
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center justify-center">
-                                                    <button onClick={() => { setResetPassOpen(u.id); setNewPass(''); }} className="p-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition" title="Reset Password"><KeyRound size={16}/></button>
+                                                    <button onClick={() => { setResetPassOpen(u.id); setNewPass(''); }} className="p-2 rounded-lg bg-slate-100 hover:bg-blue-50 text-slate-800 hover:text-blue-600 transition" title="Reset Password"><KeyRound size={16}/></button>
                                                 </div>
                                             )}
                                         </td>
@@ -159,33 +164,33 @@ function UserManagementModule() {
                 <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden">
                         <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative">
-                            <button onClick={() => setAddOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition"><XCircle size={22}/></button>
+                            <button onClick={() => setAddOpen(false)} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
                             <div className="inline-flex p-3 rounded-full bg-teal-500/20 mb-3"><Users size={24} className="text-teal-400"/></div>
                             <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Create User</h2>
                         </div>
                         <div className="p-6 bg-slate-50 space-y-4">
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Display Name</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Display Name</label>
                                 <input type="text" value={form.displayName} onChange={e => setForm({...form, displayName: e.target.value})} placeholder="e.g., Ravi Kumar" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Username *</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Username *</label>
                                 <input type="text" value={form.username} onChange={e => setForm({...form, username: e.target.value})} placeholder="e.g., ravi" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Password *</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Password *</label>
                                 <div className="relative">
                                     <input type={showPass ? 'text' : 'password'} value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="Min 4 characters" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white pr-10"/>
-                                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">{showPass ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+                                    <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-700 hover:text-slate-900">{showPass ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
                                 </div>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">Role</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Role</label>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <button type="button" onClick={() => setForm({...form, role: 'user'})} className={`p-3 rounded-xl border-2 text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 ${form.role === 'user' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-400'}`}>
+                                    <button type="button" onClick={() => setForm({...form, role: 'user'})} className={`p-3 rounded-xl border-2 text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 ${form.role === 'user' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-700'}`}>
                                         <User size={16}/> User
                                     </button>
-                                    <button type="button" onClick={() => setForm({...form, role: 'admin'})} className={`p-3 rounded-xl border-2 text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 ${form.role === 'admin' ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 bg-white text-slate-400'}`}>
+                                    <button type="button" onClick={() => setForm({...form, role: 'admin'})} className={`p-3 rounded-xl border-2 text-sm font-black uppercase tracking-wider transition flex items-center justify-center gap-2 ${form.role === 'admin' ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 bg-white text-slate-700'}`}>
                                         <ShieldCheck size={16}/> Admin
                                     </button>
                                 </div>
@@ -203,13 +208,13 @@ function UserManagementModule() {
                 <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl overflow-hidden">
                         <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative">
-                            <button onClick={() => setResetPassOpen(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white transition"><XCircle size={22}/></button>
+                            <button onClick={() => setResetPassOpen(null)} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
                             <KeyRound size={24} className="text-teal-400 mx-auto mb-2"/>
                             <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Reset Password</h2>
                         </div>
                         <div className="p-6 bg-slate-50 space-y-4">
                             <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">New Password</label>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">New Password</label>
                                 <input type="text" value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Enter new password" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                             </div>
                             <button onClick={handleResetPassword} className="w-full py-3 bg-gradient-to-r from-teal-600 to-teal-500 text-white rounded-xl font-black uppercase tracking-widest text-sm transition active:scale-[0.98]">
@@ -244,7 +249,7 @@ export default function VendureDashboard() {
             }
             setSession(s);
             // Set default tab based on role
-            setActiveTab(s.role === 'admin' ? 'pos' : 'pos');
+            setActiveTab(s.role === 'admin' ? 'home' : 'pos');
             setChecking(false);
         } catch {
             window.location.href = '/login';
@@ -257,7 +262,7 @@ export default function VendureDashboard() {
     };
 
     if (checking || !session) {
-        return <div className="flex items-center justify-center h-screen bg-slate-100 text-slate-400 font-bold">Loading...</div>;
+        return <div className="flex items-center justify-center h-screen bg-slate-100 text-slate-700 font-bold">Loading...</div>;
     }
 
     const isAdmin = session.role === 'admin';
@@ -265,12 +270,17 @@ export default function VendureDashboard() {
     // Menu items based on role
     const adminMenuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: BarChart },
-        { id: 'ledger', label: 'Ledger', icon: BookOpen },
-        { id: 'category', label: 'Products', icon: Grid },
-        { id: 'inventory', label: 'Inventory', icon: Box },
-        { id: 'pos', label: 'Retail POS Terminal', icon: ShoppingBag },
+        { id: 'token', label: 'Token Entry', icon: Hash },
+        { id: 'itemmaster', label: 'Item Master', icon: Package },
+        { id: 'purchase', label: 'Purchase', icon: ShoppingCart },
+        { id: 'payment', label: 'Payment', icon: Wallet },
+        { id: 'receipt', label: 'Receipt', icon: Receipt },
+        { id: 'pos', label: 'Sales', icon: ShoppingBag },
+        { id: 'inventory', label: 'Stock / Inventory', icon: Box },
+        { id: 'category', label: 'Products (Vendure)', icon: Grid },
         { id: 'barcode', label: 'Barcode', icon: ScanLine },
-        { id: 'report', label: 'Report', icon: FileText },
+        { id: 'ledger', label: 'Supplier Ledger', icon: BookOpen },
+        { id: 'report', label: 'Reports', icon: FileText },
         { id: 'users', label: 'User Management', icon: Users },
     ];
 
@@ -279,18 +289,23 @@ export default function VendureDashboard() {
     const renderContent = () => {
         const content = (() => {
             switch (activeTab) {
-                case 'inventory': return isAdmin ? <InventoryModule /> : null;
-                case 'pos': return <PosModule />;
                 case 'dashboard': return isAdmin ? <DashboardModule /> : null;
-                case 'ledger': return isAdmin ? <LedgerModule /> : null;
+                case 'token': return isAdmin ? <TokenEntryModule /> : null;
+                case 'itemmaster': return isAdmin ? <ItemMasterModule /> : null;
+                case 'purchase': return isAdmin ? <PurchaseModule /> : null;
+                case 'payment': return isAdmin ? <PaymentModule /> : null;
+                case 'receipt': return isAdmin ? <ReceiptModule /> : null;
+                case 'pos': return <PosModule />;
+                case 'inventory': return isAdmin ? <InventoryModule /> : null;
                 case 'category': return isAdmin ? <ProductsModule /> : null;
                 case 'barcode': return isAdmin ? <BarcodeModule /> : null;
+                case 'ledger': return isAdmin ? <LedgerModule /> : null;
                 case 'report': return isAdmin ? <ReportModule /> : null;
                 case 'users': return isAdmin ? <UserManagementModule /> : null;
                 default: return null;
             }
         })();
-        return <Suspense fallback={<div className="flex items-center justify-center h-[80vh] text-slate-400">Loading...</div>}>{content}</Suspense>;
+        return <Suspense fallback={<div className="flex items-center justify-center h-[80vh] text-slate-700">Loading...</div>}>{content}</Suspense>;
     };
 
     // ── USER ROLE: POS Only (no sidebar) ──
@@ -302,7 +317,7 @@ export default function VendureDashboard() {
                     <div className="flex items-center gap-2">
                         <span className="text-yellow-500 text-2xl font-black">#</span>
                         <span className="text-lg font-black text-white tracking-widest">HASHTAG</span>
-                        <span className="text-[10px] text-slate-500 uppercase tracking-widest ml-2">POS Terminal</span>
+                        <span className="text-[10px] text-slate-800 uppercase tracking-widest ml-2">POS Terminal</span>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
@@ -311,7 +326,7 @@ export default function VendureDashboard() {
                             </div>
                             <span className="text-white text-sm font-bold">{session.displayName}</span>
                         </div>
-                        <button onClick={handleLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white rounded-lg text-xs font-bold uppercase tracking-widest transition">
+                        <button onClick={handleLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-red-600 text-slate-700 hover:text-white rounded-lg text-xs font-bold uppercase tracking-widest transition">
                             <LogOut size={14}/> Logout
                         </button>
                     </div>
@@ -324,52 +339,138 @@ export default function VendureDashboard() {
         );
     }
 
-    // ── ADMIN ROLE: Full sidebar ──
-    return (<div className="flex h-screen bg-slate-100 font-sans">
-      <aside className="w-64 bg-slate-900 flex flex-col text-slate-300 shadow-xl z-20 flex-shrink-0">
-        <div className="h-20 flex items-center px-6 border-b border-slate-800 bg-slate-950">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2 font-black text-xl text-white tracking-widest">
-              <span className="text-yellow-500 text-3xl">#</span> HASHTAG
-            </div>
-            <div className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Billing Solutions</div>
-          </div>
-        </div>
+    // ── Top toolbar icons (horizontal bar) ──
+    const toolbarItems = [
+        { id: 'dashboard', label: 'Account\nMaster', icon: ClipboardList, bg: '#e74c3c' },
+        { id: 'ledger', label: 'Supplier', icon: BookOpen, bg: '#3498db' },
+        { id: 'users', label: 'Customer', icon: User, bg: '#2ecc71' },
+        { id: 'category', label: 'Category', icon: Grid, bg: '#f39c12' },
+        { id: 'inventory', label: 'Inventory', icon: Box, bg: '#9b59b6' },
+        { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c' },
+        { id: 'pos', label: 'Sales', icon: ShoppingBag, bg: '#e67e22' },
+        { id: 'barcode', label: 'Barcode', icon: ScanLine, bg: '#34495e' },
+        { id: 'report', label: 'Reports', icon: FileText, bg: '#2980b9' },
+        { id: 'dashboard', label: 'DayBook\nEntry', icon: ClipboardList, bg: '#8e44ad' },
+        { id: 'users', label: 'Settings', icon: Settings, bg: '#7f8c8d' },
+        { id: '_logout', label: 'Logout', icon: LogOut, bg: '#c0392b' },
+    ];
 
-        <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
-          {menuItems.map(item => {
+    // ── Left sidebar buttons ──
+    const sidebarItems = [
+        { id: 'token', label: 'Token Entry', icon: Hash, bg: '#e67e22' },
+        { id: 'itemmaster', label: 'Item Master', icon: Package, bg: '#3498db' },
+        { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c' },
+        { id: 'pos', label: 'Sales', icon: ShoppingBag, bg: '#2ecc71' },
+        { id: 'payment', label: 'Payment', icon: Wallet, bg: '#27ae60' },
+        { id: 'receipt', label: 'Receipt', icon: Receipt, bg: '#16a085' },
+        { id: 'ledger', label: 'Customer\nLedger', icon: BookOpen, bg: '#2980b9' },
+        { id: 'report', label: 'Reports', icon: FileText, bg: '#8e44ad' },
+    ];
+
+    // Home/welcome screen
+    const showHome = activeTab === 'home' || activeTab === null;
+
+    // ── ADMIN ROLE: Classic POS Software Layout ──
+    return (<div className="flex flex-col h-screen font-sans select-none" style={{background:'linear-gradient(135deg, #1a5276 0%, #2e86c1 30%, #85c1e9 60%, #d4e6f1 100%)'}}>
+
+      {/* ═══ ROW 1: Blue title bar ═══ */}
+      <div className="h-7 flex items-center justify-between px-3 shrink-0" style={{background:'linear-gradient(90deg, #1a5276, #2980b9)'}}>
+        <div className="flex items-center gap-2">
+          <span className="text-yellow-400 font-black text-base">#</span>
+          <span className="text-white text-xs font-black tracking-[3px]">HASHTAG PRIVATE LIMITED</span>
+          <span className="text-cyan-100 text-[10px] font-bold ml-2">— 2026-2027</span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="text-cyan-100 font-bold">{session.displayName}</span>
+          <span className="text-cyan-100">|</span>
+          <span className="text-cyan-100 font-bold">{new Date().toLocaleDateString('en-IN')}</span>
+        </div>
+      </div>
+
+      {/* ═══ ROW 2: Top toolbar with icon buttons ═══ */}
+      <div className="h-[68px] flex items-center px-1.5 gap-[3px] shrink-0 border-b border-[#85c1e9]" style={{background:'linear-gradient(180deg, #f0f4f8 0%, #dce6f0 100%)'}}>
+        {toolbarItems.map((item, i) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (<button key={i} onClick={() => {
+            if (item.id === '_logout') { handleLogout(); return; }
+            setActiveTab(item.id);
+          }} className={`flex flex-col items-center justify-center rounded border transition-all min-w-[68px] h-[58px] px-1 ${isActive
+            ? 'bg-blue-100 border-blue-400 shadow-inner'
+            : 'bg-white border-[#c0c8d0] hover:bg-blue-50 hover:border-blue-300 shadow-sm'}`} style={{boxShadow: isActive ? 'inset 0 2px 4px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.1)'}}>
+            <div className="w-8 h-8 rounded flex items-center justify-center mb-0.5" style={{background:item.bg}}>
+              <Icon size={18} className="text-white"/>
+            </div>
+            <span className="text-[8px] font-bold text-[#2c3e50] leading-[10px] text-center whitespace-pre-line">{item.label}</span>
+          </button>);
+        })}
+      </div>
+
+      {/* ═══ ROW 3: Main area = Left sidebar + Content ═══ */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* ── LEFT SIDEBAR ── */}
+        <div className="w-[110px] flex flex-col py-1.5 px-1.5 gap-[5px] shrink-0 overflow-y-auto" style={{background:'linear-gradient(180deg, #e8eff5 0%, #d0dce8 100%)', borderRight:'2px solid #a8c4d8'}}>
+          {sidebarItems.map((item, i) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
-            return (<button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center py-3 px-4 rounded-xl text-sm font-bold transition-all ${isActive
-                    ? 'bg-emerald-600 text-white shadow-md transform scale-[1.02]'
-                    : 'hover:bg-slate-800 hover:text-white text-slate-400'}`}>
-                <Icon className={`mr-4 h-5 w-5 ${isActive ? 'text-white' : 'text-slate-500'}`}/>
-                {item.label}
-              </button>);
+            return (<button key={i} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-2 py-2 px-2 rounded border transition-all w-full text-left ${isActive
+              ? 'bg-blue-100 border-blue-400 shadow-inner'
+              : 'bg-white border-[#c0c8d0] hover:bg-blue-50 hover:border-blue-300 shadow-sm'}`}>
+              <div className="w-8 h-8 rounded flex items-center justify-center shrink-0" style={{background:item.bg}}>
+                <Icon size={16} className="text-white"/>
+              </div>
+              <span className="text-[9px] font-bold text-[#2c3e50] leading-[11px] whitespace-pre-line">{item.label}</span>
+            </button>);
           })}
-        </nav>
-
-        {/* User info + logout at bottom */}
-        <div className="p-4 border-t border-slate-800">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center">
-              <ShieldCheck size={18} className="text-white"/>
-            </div>
-            <div>
-              <p className="text-white text-sm font-bold">{session.displayName}</p>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{session.role}</p>
-            </div>
-          </div>
-          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2.5 bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition">
-            <LogOut size={14}/> Logout
-          </button>
         </div>
-      </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden relative w-full bg-slate-100">
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 relative">
-          {renderContent()}
-        </main>
+        {/* ── CENTER CONTENT ── */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {showHome ? (
+            /* ── Welcome / Home Screen with gradient background ── */
+            <div className="flex-1 flex flex-col items-center justify-center relative overflow-hidden" style={{background:'linear-gradient(135deg, #1a5276 0%, #2e86c1 25%, #5dade2 50%, #85c1e9 75%, #aed6f1 100%)'}}>
+              {/* Decorative wave overlay */}
+              <div className="absolute inset-0 opacity-50" style={{backgroundImage:'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 1440 320\'%3E%3Cpath fill=\'%23ffffff\' d=\'M0,160L48,170.7C96,181,192,203,288,197.3C384,192,480,160,576,149.3C672,139,768,149,864,176C960,203,1056,245,1152,245.3C1248,245,1344,203,1392,181.3L1440,160L1440,320L0,320Z\'/%3E%3C/svg%3E")', backgroundSize:'cover', backgroundPosition:'bottom'}}/>
+              <div className="relative z-10 text-center">
+                <div className="text-6xl font-black text-white mb-2 tracking-[6px] drop-shadow-lg" style={{textShadow:'2px 3px 6px rgba(0,0,0,0.3)'}}>
+                  <span className="text-yellow-400">#</span> HASHTAG
+                </div>
+                <div className="text-white text-xl font-black tracking-[8px] uppercase mb-6" style={{textShadow:'1px 2px 4px rgba(0,0,0,0.3)'}}>
+                  Medical POS System
+                </div>
+                <div className="text-cyan-100 text-sm font-bold tracking-widest">EASY STEP — SAVE YOUR TIME</div>
+                <div className="mt-8 flex items-center gap-3">
+                  <button onClick={() => setActiveTab('pos')} className="px-6 py-2.5 bg-white/20 backdrop-blur border border-white/30 text-white rounded-lg font-bold text-sm hover:bg-white/30 transition">Start Billing</button>
+                  <button onClick={() => setActiveTab('itemmaster')} className="px-6 py-2.5 bg-white/20 backdrop-blur border border-white/30 text-white rounded-lg font-bold text-sm hover:bg-white/30 transition">Item Master</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ── Module content ── */
+            <>
+              <div className="h-6 flex items-center justify-between px-3 shrink-0 border-b border-[#bdc3c7]" style={{background:'linear-gradient(90deg, #dce6f0, #eef2f7)'}}>
+                <span className="text-[10px] font-black text-[#2c3e50] uppercase tracking-wider flex items-center gap-1">
+                  {(() => { const m = adminMenuItems.find(m => m.id === activeTab); return m ? <><m.icon size={12}/> {m.label}</> : activeTab; })()}
+                </span>
+                <button onClick={() => setActiveTab('home')} className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">✕ Close</button>
+              </div>
+              <main className="flex-1 overflow-auto p-2 bg-[#ecf0f1]">
+                {renderContent()}
+              </main>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ═══ BOTTOM STATUS BAR ═══ */}
+      <div className="h-[22px] flex items-center justify-between px-3 shrink-0 border-t border-[#1a5276]" style={{background:'linear-gradient(90deg, #2c3e50, #34495e)'}}>
+        <div className="flex items-center gap-2 text-[9px] text-[#34495e]">
+          <span>Ready</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/>
+        </div>
+        <span className="text-[9px] text-[#2c3e50] font-bold">HASHTAG PRIVATE LIMITED (2026-2027)</span>
+        <span className="text-[9px] text-[#34495e]">{new Date().toLocaleString('en-IN', {weekday:'short', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true})}</span>
       </div>
     </div>);
 }

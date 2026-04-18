@@ -12,6 +12,7 @@ import { DashboardPlugin } from '@vendure/dashboard/plugin';
 import { GraphiqlPlugin } from '@vendure/graphiql-plugin';
 import { LedgerPlugin } from './plugins/ledger/ledger.plugin';
 import { PosAuthPlugin } from './plugins/pos-auth/pos-auth.plugin';
+import { PharmaPlugin } from './plugins/pharma/pharma.plugin';
 import 'dotenv/config';
 import path from 'path';
 
@@ -108,5 +109,6 @@ export const config: VendureConfig = {
         }),
         LedgerPlugin,
         PosAuthPlugin,
+        PharmaPlugin,
     ],
 };

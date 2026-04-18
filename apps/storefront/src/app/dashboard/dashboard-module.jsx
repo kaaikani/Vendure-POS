@@ -107,9 +107,9 @@ export default function DashboardModule() {
                 <s.icon size={28} strokeWidth={2.5}/>
               </div>
               <div className="flex-1">
-                <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1">{s.title}</div>
+                <div className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-1">{s.title}</div>
                 <div className="text-2xl font-black text-slate-800 tracking-tight">{s.val}</div>
-                <div className="text-[10px] font-bold text-slate-400 mt-0.5">{s.sub}</div>
+                <div className="text-[10px] font-bold text-slate-700 mt-0.5">{s.sub}</div>
               </div>
             </div>
           </Col>))}
@@ -135,7 +135,7 @@ export default function DashboardModule() {
                     <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '12px' }}/>
                     <Bar dataKey="sales" radius={[4, 4, 0, 0]} fill="url(#gradientBar)" barSize={40}/>
                   </BarChart>
-                </ResponsiveContainer>) : (<div className="flex items-center justify-center h-full text-slate-300 font-bold">
+                </ResponsiveContainer>) : (<div className="flex items-center justify-center h-full text-slate-900 font-bold">
                   No sales data yet. Complete a checkout in POS Terminal.
                 </div>)}
             </div>
@@ -146,13 +146,13 @@ export default function DashboardModule() {
             <div className="space-y-5 mt-2">
               {paymentData.map((p, i) => (<div key={i} className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-2 font-bold text-slate-600">
-                      <div className="p-1.5 rounded-md bg-slate-50 text-slate-500"><p.icon size={16}/></div>
+                    <div className="flex items-center gap-2 font-bold text-slate-900">
+                      <div className="p-1.5 rounded-md bg-slate-50 text-slate-800"><p.icon size={16}/></div>
                       {p.name}
                     </div>
                     <div className="text-right">
                       <span className="font-extrabold text-slate-800">{p.value}%</span>
-                      <span className="text-[10px] text-slate-400 ml-1 font-bold">{fmt(p.amount)}</span>
+                      <span className="text-[10px] text-slate-700 ml-1 font-bold">{fmt(p.amount)}</span>
                     </div>
                   </div>
                   <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
@@ -182,8 +182,8 @@ export default function DashboardModule() {
         <Col xs={24} lg={14}>
           <DashboardCard title="Recent Transactions">
             <div className="overflow-x-auto">
-              {recentTx.length === 0 ? (<div className="py-10 text-center text-slate-300 font-bold">No transactions yet</div>) : (<table className="w-full text-left">
-                  <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {recentTx.length === 0 ? (<div className="py-10 text-center text-slate-900 font-bold">No transactions yet</div>) : (<table className="w-full text-left">
+                  <thead className="bg-slate-50/50 text-[10px] font-black text-slate-700 uppercase tracking-widest">
                     <tr>
                       <th className="px-4 py-3 border-b border-slate-100">Invoice</th>
                       <th className="px-4 py-3 border-b border-slate-100">Customer</th>
@@ -195,7 +195,7 @@ export default function DashboardModule() {
                   <tbody className="divide-y divide-slate-50">
                     {recentTx.map((tx, i) => (<tr key={i} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 text-sm font-bold text-slate-700">{tx.invoiceId}</td>
-                        <td className="px-4 py-3 text-xs font-bold text-slate-500">{tx.customer?.name || 'Walk-in'}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-slate-800">{tx.customer?.name || 'Walk-in'}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${tx.saleType === 'ONLINE' ? 'bg-emerald-100 text-emerald-700' :
                     tx.saleType === 'OFFLINE' ? 'bg-blue-100 text-blue-700' :
@@ -204,7 +204,7 @@ export default function DashboardModule() {
                             {tx.saleType}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-[10px] font-bold text-slate-400">
+                        <td className="px-4 py-3 text-[10px] font-bold text-slate-700">
                           {tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
                         </td>
                         <td className="px-4 py-3 text-sm font-black text-slate-800 text-right">{fmt(Math.round(tx.grandTotal))}</td>
@@ -217,12 +217,12 @@ export default function DashboardModule() {
 
         <Col xs={24} lg={10}>
           <DashboardCard title="Top Selling Products">
-            {topSelling.length === 0 ? (<div className="py-10 text-center text-slate-300 font-bold">No sales data yet</div>) : (<div className="space-y-4">
+            {topSelling.length === 0 ? (<div className="py-10 text-center text-slate-900 font-bold">No sales data yet</div>) : (<div className="space-y-4">
                 {topSelling.map((item, i) => (<div key={i} className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-[10px] font-black text-emerald-700">#{i + 1}</div>
                     <div className="flex-1">
                       <div className="text-[11px] font-extrabold text-slate-700 leading-tight">{item.name}</div>
-                      <div className="text-[9px] font-bold text-slate-400">{item.qty} units sold</div>
+                      <div className="text-[9px] font-bold text-slate-700">{item.qty} units sold</div>
                     </div>
                     <div className="text-xs font-black text-emerald-600">{fmt(Math.round(item.revenue))}</div>
                   </div>))}

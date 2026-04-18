@@ -66,9 +66,9 @@ export default function ReportModule() {
       {/* Summary Cards */}
       <div className="p-6 bg-white border-b border-slate-200 shadow-sm shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-4 rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Total Sales</p>
+          <p className="text-[11px] font-black uppercase tracking-widest text-slate-700 mb-1">Total Sales</p>
           <h3 className="text-2xl font-black text-slate-800 tracking-tight">₹{totalSales.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
-          <p className="text-[9px] font-bold text-slate-400 mt-1">{filteredReports.length} transactions</p>
+          <p className="text-[9px] font-bold text-slate-700 mt-1">{filteredReports.length} transactions</p>
         </div>
         <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-4 rounded-xl border border-emerald-200 shadow-sm">
           <div className="flex items-center gap-1.5 mb-1"><Wifi size={12} className="text-emerald-500"/><p className="text-[11px] font-black uppercase tracking-widest text-emerald-500">Online</p></div>
@@ -89,14 +89,14 @@ export default function ReportModule() {
         <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 h-10 w-full md:w-auto">
           {['ALL', 'ONLINE', 'OFFLINE', 'CREDIT'].map(type => (<button key={type} onClick={() => setFilterType(type)} className={`flex-1 md:px-6 text-xs font-black uppercase tracking-widest transition-all rounded-md flex justify-center items-center gap-1.5 ${filterType === type
                 ? type === 'ALL' ? 'bg-slate-800 text-white shadow-sm' : type === 'ONLINE' ? 'bg-emerald-600 text-white shadow-sm' : type === 'OFFLINE' ? 'bg-blue-600 text-white shadow-sm' : 'bg-orange-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-600'}`}>
+                : 'text-slate-700 hover:text-slate-900'}`}>
               {type !== 'ALL' && modeIcon(type)} {type}
             </button>))}
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+            <Search className="absolute left-3 top-2.5 text-slate-700" size={16}/>
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search Invoice or Customer..." className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none font-bold"/>
           </div>
           <button onClick={exportCSV} className="h-10 px-4 border-2 border-slate-800 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition flex items-center justify-center gap-2 shadow-sm font-bold text-sm">
@@ -114,28 +114,28 @@ export default function ReportModule() {
           <table className="w-full text-left whitespace-nowrap text-sm border-collapse">
             <thead className="bg-[#f8fafc] sticky top-0 z-10 border-b border-slate-200">
               <tr>
-                <th className="p-4 px-6 text-xs uppercase font-black tracking-widest text-slate-400">Invoice</th>
-                <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400">Date & Time</th>
-                <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400">Customer</th>
-                <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400">Mode</th>
-                <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-400 text-center">Items</th>
-                <th className="p-4 text-right text-xs uppercase font-black tracking-widest text-slate-400">Total</th>
+                <th className="p-4 px-6 text-xs uppercase font-black tracking-widest text-slate-700">Invoice</th>
+                <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700">Date & Time</th>
+                <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700">Customer</th>
+                <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700">Mode</th>
+                <th className="p-4 text-xs uppercase font-black tracking-widest text-slate-700 text-center">Items</th>
+                <th className="p-4 text-right text-xs uppercase font-black tracking-widest text-slate-700">Total</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
+            <tbody className="divide-y divide-slate-100 font-bold">
               {filteredReports.map((r) => (<React.Fragment key={r.invoiceId + r.timestamp}>
                   <tr onClick={() => setExpandedId(expandedId === r.invoiceId ? null : r.invoiceId)} className="hover:bg-slate-50 cursor-pointer transition-colors">
                     <td className="p-4 px-6 font-bold text-slate-800">{r.invoiceId}</td>
                     <td className="p-4">
                       <p className="font-bold text-slate-700">{r.date}</p>
-                      <p className="text-xs text-slate-400">{new Date(r.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
+                      <p className="text-xs text-slate-700">{new Date(r.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
                     </td>
                     <td className="p-4">
                       <p className="font-bold text-slate-700">{r.customer.name}</p>
-                      {r.customer.phone && <p className="text-xs text-slate-400">{r.customer.phone}</p>}
+                      {r.customer.phone && <p className="text-xs text-slate-700">{r.customer.phone}</p>}
                     </td>
                     <td className="p-4">{modeBadge(r.saleType)}</td>
-                    <td className="p-4 text-center font-bold text-slate-600">{r.items.length}</td>
+                    <td className="p-4 text-center font-bold text-slate-900">{r.items.length}</td>
                     <td className="p-4 text-right font-black text-slate-800">₹{r.grandTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
                   </tr>
 
@@ -144,13 +144,13 @@ export default function ReportModule() {
                       <td colSpan={6} className="p-0">
                         <div className="p-6 border-l-4 border-teal-400">
                           <div className="grid grid-cols-4 gap-4 mb-4 text-xs">
-                            <div><span className="text-slate-400 font-black uppercase text-[10px]">Subtotal</span><p className="font-black text-slate-700">₹{r.subtotal.toFixed(2)}</p></div>
-                            <div><span className="text-slate-400 font-black uppercase text-[10px]">Discount</span><p className="font-black text-red-500">-₹{r.discount.toFixed(2)}</p></div>
-                            <div><span className="text-slate-400 font-black uppercase text-[10px]">Tax (5%)</span><p className="font-black text-slate-700">₹{r.taxAmount.toFixed(2)}</p></div>
-                            <div><span className="text-slate-400 font-black uppercase text-[10px]">Received</span><p className="font-black text-emerald-600">₹{r.receivedAmount.toFixed(2)}</p></div>
+                            <div><span className="text-slate-700 font-black uppercase text-[10px]">Subtotal</span><p className="font-black text-slate-700">₹{r.subtotal.toFixed(2)}</p></div>
+                            <div><span className="text-slate-700 font-black uppercase text-[10px]">Discount</span><p className="font-black text-red-500">-₹{r.discount.toFixed(2)}</p></div>
+                            <div><span className="text-slate-700 font-black uppercase text-[10px]">Tax (5%)</span><p className="font-black text-slate-700">₹{r.taxAmount.toFixed(2)}</p></div>
+                            <div><span className="text-slate-700 font-black uppercase text-[10px]">Received</span><p className="font-black text-emerald-600">₹{r.receivedAmount.toFixed(2)}</p></div>
                           </div>
                           <table className="w-full text-xs">
-                            <thead className="bg-slate-100 text-[10px] font-black text-slate-400 uppercase">
+                            <thead className="bg-slate-100 text-[10px] font-black text-slate-700 uppercase">
                               <tr><th className="p-2 text-left">Product</th><th className="p-2 text-center">Qty</th><th className="p-2 text-right">Price</th><th className="p-2 text-right">Amount</th></tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -170,10 +170,10 @@ export default function ReportModule() {
               {filteredReports.length === 0 && (<tr>
                   <td colSpan={6} className="py-20 text-center">
                     <div className="inline-flex p-5 rounded-full bg-slate-50 border border-slate-100 mb-4">
-                      <FileText size={40} className="text-slate-300"/>
+                      <FileText size={40} className="text-slate-900"/>
                     </div>
-                    <p className="text-lg font-bold text-slate-400">No transactions found</p>
-                    <p className="text-sm text-slate-300 mt-1">Complete a sale in POS Terminal to see reports here</p>
+                    <p className="text-lg font-bold text-slate-700">No transactions found</p>
+                    <p className="text-sm text-slate-900 mt-1">Complete a sale in POS Terminal to see reports here</p>
                   </td>
                 </tr>)}
             </tbody>
