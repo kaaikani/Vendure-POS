@@ -161,3 +161,42 @@ export class DeleteTokenCommand {
         return data.deletePharmaToken;
     }
 }
+
+// ══════════════════════════════════════════════════════════════
+// SALES (Bills)
+// ══════════════════════════════════════════════════════════════
+const SALE_FIELDS = `id createdAt updatedAt billNo billDate billTime saleType bookNo billRef customerName customerPhone customerAddress salesMan itemsJson subtotal taxAmount discount transportCharges grandTotal cashAmount upiAmount cardAmount receivedAmount balanceDue changeReturned remarks`;
+
+export class ListSalesQuery {
+    async execute(fromDate, toDate) {
+        const key = `pharma:sales:${fromDate||'all'}:${toDate||'all'}`;
+        return cachedFetch(key, async () => {
+            const data = await gql(`query Sales($f: String, $t: String) { pharmaSales(fromDate: $f, toDate: $t) { ${SALE_FIELDS} } }`, { useAdmin: true, variables: { f: fromDate || null, t: toDate || null } });
+            return (data.pharmaSales || []).map(s => ({ ...s, items: JSON.parse(s.itemsJson || '[]') }));
+        }, 30_000);
+    }
+}
+
+export class GetSaleQuery {
+    async execute(id) {
+        const data = await gql(`query Sale($id: ID!) { pharmaSale(id: $id) { ${SALE_FIELDS} } }`, { useAdmin: true, variables: { id } });
+        if (!data.pharmaSale) return null;
+        return { ...data.pharmaSale, items: JSON.parse(data.pharmaSale.itemsJson || '[]') };
+    }
+}
+
+export class CreateSaleCommand {
+    async execute(input) {
+        const data = await gql(`mutation CreateSale($input: PharmaSaleInput!) { createPharmaSale(input: $input) { ${SALE_FIELDS} } }`, { useAdmin: true, variables: { input } });
+        invalidateCache('pharma:sales');
+        return data.createPharmaSale;
+    }
+}
+
+export class DeleteSaleCommand {
+    async execute(id) {
+        const data = await gql(`mutation DelSale($id: ID!) { deletePharmaSale(id: $id) }`, { useAdmin: true, variables: { id } });
+        invalidateCache('pharma:sales');
+        return data.deletePharmaSale;
+    }
+}

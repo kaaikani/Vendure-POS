@@ -33,4 +33,10 @@ export class PharmaResolver {
     @Query() async pharmaTokens(@Ctx() ctx, @Args('tokenDate') tokenDate) { return this.svc.listTokens(ctx, tokenDate); }
     @Mutation() async createPharmaToken(@Ctx() ctx, @Args() args) { return this.svc.createToken(ctx, args.input); }
     @Mutation() async deletePharmaToken(@Ctx() ctx, @Args('id') id) { return this.svc.deleteToken(ctx, id); }
+
+    // ── Sales ──
+    @Query() async pharmaSales(@Ctx() ctx, @Args('fromDate') fromDate, @Args('toDate') toDate) { return this.svc.listSales(ctx, fromDate, toDate); }
+    @Query() async pharmaSale(@Ctx() ctx, @Args('id') id) { return this.svc.getSale(ctx, id); }
+    @Mutation() async createPharmaSale(@Ctx() ctx, @Args() args) { return this.svc.createSale(ctx, args.input); }
+    @Mutation() async deletePharmaSale(@Ctx() ctx, @Args('id') id) { return this.svc.deleteSale(ctx, id); }
 }

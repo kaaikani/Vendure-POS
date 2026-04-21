@@ -244,7 +244,7 @@ export default function PurchaseModule() {
                             <td className="w-7 text-center text-[#2980b9] text-[11px] font-black border-r border-[#dde5ec]">{i === rows.length-1 ? '▶*' : ''}</td>
                             {cols.map(c => (<td key={c.key} className="p-0 border-r border-[#dde5ec]">
                                 {c.key === 'itemName' ? (
-                                    <input type="text" value={r.itemName} onFocus={()=>openItemSearch(i)} readOnly className={`${cellStyle} cursor-pointer bg-[#eaf5fb]`} style={{width: c.w}} title="Click to search item"/>
+                                    <input type="text" value={r.itemName || ''} onFocus={()=>openItemSearch(i)} readOnly className={`${cellStyle} cursor-pointer bg-[#eaf5fb]`} style={{width: c.w}} title="Click to search item"/>
                                 ) : (
                                     <input type="text" value={r[c.key] || ''} onChange={e=>updateRow(i, c.key, e.target.value)} className={cellStyle} style={{width: c.w, textAlign: ['qty','free','mrp','puRate','saleRate','amount','discPct','discAmt','taxPct'].includes(c.key) ? 'right' : 'left'}}/>
                                 )}

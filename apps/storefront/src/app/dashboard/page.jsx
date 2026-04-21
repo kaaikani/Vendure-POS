@@ -5,6 +5,7 @@ import ItemMasterModule from './item-master-module';
 import PurchaseModule from './purchase-module';
 import PaymentModule from './payment-module';
 import ReceiptModule from './receipt-module';
+import SettingsModule from './settings-module';
 import TokenEntryModule from './token-entry-module';
 import InventoryModule from './inventory-module';
 import LedgerModule from './ledger-module';
@@ -233,6 +234,8 @@ export default function VendureDashboard() {
     const [session, setSession] = useState(null);
     const [checking, setChecking] = useState(true);
     const [activeTab, setActiveTab] = useState(null);
+    const [settingsSection, setSettingsSection] = useState('company-creation');
+    const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
 
     // Auth guard: check session on mount
     useEffect(() => {
@@ -282,6 +285,7 @@ export default function VendureDashboard() {
         { id: 'ledger', label: 'Supplier Ledger', icon: BookOpen },
         { id: 'report', label: 'Reports', icon: FileText },
         { id: 'users', label: 'User Management', icon: Users },
+        { id: 'settings', label: 'Settings', icon: Settings },
     ];
 
     const menuItems = isAdmin ? adminMenuItems : [];
@@ -302,6 +306,7 @@ export default function VendureDashboard() {
                 case 'ledger': return isAdmin ? <LedgerModule /> : null;
                 case 'report': return isAdmin ? <ReportModule /> : null;
                 case 'users': return isAdmin ? <UserManagementModule /> : null;
+                case 'settings': return isAdmin ? <SettingsModule section={settingsSection} onChangeSection={setSettingsSection}/> : null;
                 default: return null;
             }
         })();
@@ -351,7 +356,7 @@ export default function VendureDashboard() {
         { id: 'barcode', label: 'Barcode', icon: ScanLine, bg: '#34495e' },
         { id: 'report', label: 'Reports', icon: FileText, bg: '#2980b9' },
         { id: 'dashboard', label: 'DayBook\nEntry', icon: ClipboardList, bg: '#8e44ad' },
-        { id: 'users', label: 'Settings', icon: Settings, bg: '#7f8c8d' },
+        { id: 'settings', label: 'Settings', icon: Settings, bg: '#7f8c8d', hasDropdown: true },
         { id: '_logout', label: 'Logout', icon: LogOut, bg: '#c0392b' },
     ];
 
@@ -392,17 +397,50 @@ export default function VendureDashboard() {
         {toolbarItems.map((item, i) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
-          return (<button key={i} onClick={() => {
-            if (item.id === '_logout') { handleLogout(); return; }
-            setActiveTab(item.id);
-          }} className={`flex flex-col items-center justify-center rounded border transition-all min-w-[68px] h-[58px] px-1 ${isActive
-            ? 'bg-blue-100 border-blue-400 shadow-inner'
-            : 'bg-white border-[#c0c8d0] hover:bg-blue-50 hover:border-blue-300 shadow-sm'}`} style={{boxShadow: isActive ? 'inset 0 2px 4px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.1)'}}>
-            <div className="w-8 h-8 rounded flex items-center justify-center mb-0.5" style={{background:item.bg}}>
-              <Icon size={18} className="text-white"/>
-            </div>
-            <span className="text-[8px] font-bold text-[#2c3e50] leading-[10px] text-center whitespace-pre-line">{item.label}</span>
-          </button>);
+          const isSettings = item.hasDropdown;
+          return (<div key={i} className="relative">
+            <button onClick={() => {
+              if (item.id === '_logout') { handleLogout(); return; }
+              if (isSettings) { setSettingsMenuOpen(p => !p); return; }
+              setActiveTab(item.id);
+              setSettingsMenuOpen(false);
+            }} className={`flex flex-col items-center justify-center rounded border transition-all min-w-[68px] h-[58px] px-1 ${isActive
+              ? 'bg-blue-100 border-blue-400 shadow-inner'
+              : 'bg-white border-[#c0c8d0] hover:bg-blue-50 hover:border-blue-300 shadow-sm'}`} style={{boxShadow: isActive ? 'inset 0 2px 4px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.1)'}}>
+              <div className="w-8 h-8 rounded flex items-center justify-center mb-0.5" style={{background:item.bg}}>
+                <Icon size={18} className="text-white"/>
+              </div>
+              <span className="text-[8px] font-bold text-[#2c3e50] leading-[10px] text-center whitespace-pre-line">{item.label}{isSettings && ' ▾'}</span>
+            </button>
+
+            {/* Settings dropdown menu */}
+            {isSettings && settingsMenuOpen && (<>
+              <div className="fixed inset-0 z-40" onClick={()=>setSettingsMenuOpen(false)}/>
+              <div className="absolute left-0 top-full mt-0.5 w-60 bg-white border-2 border-[#1a5276] shadow-2xl z-50" style={{color:'#000'}}>
+                {[
+                  { id: 'company-creation', label: 'Company Creation' },
+                  { id: 'company-updation', label: 'Company Updation' },
+                  { id: 'company-selection', label: 'Company Selection' },
+                  { id: 'user-creation', label: 'User Creation' },
+                  { id: 'database-backup', label: 'DataBase BackUp' },
+                  { id: 'change-password', label: 'Change Password' },
+                  { id: 'config-settings', label: 'Config Settings' },
+                  { id: 'barcode-design', label: 'Barcode Design' },
+                  { id: 'print-settings', label: 'Print Settings' },
+                ].map(s => (
+                  <button key={s.id} onClick={(e) => {
+                    e.stopPropagation();
+                    setSettingsSection(s.id);
+                    setActiveTab('settings');
+                    setSettingsMenuOpen(false);
+                  }} style={{color:'#000', background:'#fff'}} onMouseEnter={(e)=>{e.currentTarget.style.background='#2980b9';e.currentTarget.style.color='#fff';}} onMouseLeave={(e)=>{e.currentTarget.style.background='#fff';e.currentTarget.style.color='#000';}}
+                  className="w-full text-left px-4 py-2.5 text-[13px] font-black border-b border-slate-200 last:border-0 transition block">
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </>)}
+          </div>);
         })}
       </div>
 

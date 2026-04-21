@@ -71,12 +71,21 @@ export default function ItemMasterModule() {
 
     const handleSave = async () => {
         if (!form.itemName?.trim()) return alert('Item Name is required.');
-        // Strip fields we don't send to backend
-        const { id, createdAt, updatedAt, sizesJson, hsnSac, ...rest } = form;
+        // Only send fields accepted by PharmaItemInput — strip entity-only fields
         const input = {
-            ...rest,
             code: String(form.code || ''),
-            hsnCode: form.hsnCode || form.hsnSac || '',
+            itemName: String(form.itemName),
+            tamilName: String(form.tamilName || ''),
+            category: String(form.category || 'Na'),
+            groupName: String(form.groupName || form.group || 'General'),
+            brand: String(form.brand || ''),
+            hsnCode: String(form.hsnCode || form.hsnSac || ''),
+            barcode: String(form.barcode || ''),
+            unit: String(form.unit || 'NA'),
+            packingUnit: String(form.packingUnit || ''),
+            size: String(form.size || ''),
+            taxName: String(form.taxName || 'GST 5%'),
+            mfr: String(form.mfr || ''),
             purchaseRate: parseFloat(form.purchaseRate) || 0,
             salesRate: parseFloat(form.salesRate) || 0,
             mrpRate: parseFloat(form.mrpRate) || 0,
@@ -90,6 +99,10 @@ export default function ItemMasterModule() {
             discount: parseFloat(form.discount) || 0,
             profitMargin: parseFloat(form.profitMargin) || 0,
             incentivePct: parseFloat(form.incentivePct) || 0,
+            batchNo: String(form.batchNo || ''),
+            mfgDate: String(form.mfgDate || ''),
+            expiryDate: String(form.expiryDate || ''),
+            serialNo: String(form.serialNo || ''),
             minStock: parseFloat(form.minStock) || 0,
             maxStock: parseFloat(form.maxStock) || 0,
             minStkQty: parseFloat(form.minStkQty) || 0,
@@ -101,7 +114,7 @@ export default function ItemMasterModule() {
         };
         try {
             if (mode === 'new') await new CreateItemCommand().execute(input);
-            else if (mode === 'edit') await new UpdateItemCommand().execute(id, input);
+            else if (mode === 'edit') await new UpdateItemCommand().execute(form.id, input);
             await loadAll();
             setMode('view');
         } catch (err) { alert(err.message); }

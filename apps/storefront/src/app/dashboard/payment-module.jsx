@@ -269,7 +269,7 @@ export default function PaymentModule() {
                             {cols.map(c => (
                                 <td key={c.key} className="p-0 border-r border-[#b0c4d0]">
                                     {c.key === 'invoiceNo' ? (
-                                        <input type="text" value={r.invoiceNo} onFocus={()=>openInvSearch(i)} readOnly className={`${cell} cursor-pointer`} style={{width: c.w}} title="Click to search invoice"/>
+                                        <input type="text" value={r.invoiceNo || ''} onFocus={()=>openInvSearch(i)} readOnly className={`${cell} cursor-pointer`} style={{width: c.w}} title="Click to search invoice"/>
                                     ) : (
                                         <input type="text" value={r[c.key] || ''} onChange={e=>updateRow(i, c.key, e.target.value)}
                                             readOnly={['invDate','totalAmt','paidAmt','balanceAmt','discAmt','netAmt'].includes(c.key)}

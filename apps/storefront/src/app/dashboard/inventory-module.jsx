@@ -1,276 +1,281 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { Package, PlusCircle, Search, Filter, ArrowDownRight, AlertTriangle, Truck, FileText, Download, Edit, Box, CheckCircle, BarChart2, Layers, Repeat, ShieldAlert, Archive } from 'lucide-react';
-import { gql } from '../../core/queries/gql';
-async function fetchVendure(query, variables = {}) {
-    return gql(query, { useAdmin: true, variables });
-}
-const TABS = [
-    'Overview', 'Products', 'Stock Levels', 'Purchase Orders', 'Goods Receiving',
-    'Suppliers', 'Adjustments', 'Transfers', 'Returns', 'Batch Tracking', 'Reports'
-];
+import React, { useState, useEffect, useMemo } from 'react';
+import { Package, Search, Download, AlertTriangle, CheckCircle, TrendingDown, TrendingUp, Box, ShieldAlert, Activity, RefreshCw, Layers } from 'lucide-react';
+import { ListItemsQuery } from '../../core/queries/pharma.query';
+import { invalidateCache } from '../../core/queries/cache';
+
+// Read sales reports from localStorage to compute stock usage
+function loadReports() { try { return JSON.parse(localStorage.getItem('pos_reports') || '[]'); } catch { return []; } }
+
 export default function InventoryModule() {
-    const [activeTab, setActiveTab] = useState('Overview');
-    return (<div className="flex flex-col h-[85vh] bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      {/* Module Header */}
-      <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-        <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-          <Package className="text-emerald-600"/> Inventory Management
-        </h2>
-        <div className="flex gap-2">
-           <button className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-300 rounded text-sm font-bold text-slate-900 hover:bg-slate-50">
-             <Download size={16}/> Export
-           </button>
-        </div>
-      </div>
+    const [items, setItems] = useState([]);
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [filterStatus, setFilterStatus] = useState('ALL'); // ALL | IN_STOCK | LOW | OUT | EXPIRED | EXPIRING
+    const [lastRefresh, setLastRefresh] = useState(new Date());
 
-      {/* Sub-Navigation Tabs */}
-      <div className="flex overflow-x-auto border-b border-slate-200 bg-white px-2 scrollbar-hide">
-        {TABS.map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold whitespace-nowrap border-b-2 transition-colors ${activeTab === tab
-                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                : 'border-transparent text-slate-800 hover:text-slate-800 hover:bg-slate-50'}`}>
-            {tab}
-          </button>))}
-      </div>
-
-      {/* Content Area */}
-      <div className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-6">
-        {activeTab === 'Overview' && <OverviewTab />}
-        {activeTab === 'Products' && <ProductsTab />}
-        {activeTab === 'Stock Levels' && <StockLevelsTab />}
-        {activeTab === 'Purchase Orders' && <POTab />}
-        {activeTab === 'Goods Receiving' && <GoodsReceiveTab />}
-        {activeTab === 'Suppliers' && <SuppliersTab />}
-        {activeTab === 'Adjustments' && <AdjustmentsTab />}
-        {activeTab === 'Transfers' && <TransfersTab />}
-        {activeTab === 'Returns' && <ReturnsTab />}
-        {activeTab === 'Batch Tracking' && <BatchTab />}
-        {activeTab === 'Reports' && <ReportsTab />}
-      </div>
-    </div>);
-}
-// -----------------------------------------------------------------------------
-// SUB-TAB COMPONENTS
-// -----------------------------------------------------------------------------
-function OverviewTab() {
-    const stats = [
-        { title: 'Total Items', val: '1,248', icon: Box, color: 'text-blue-600', bg: 'bg-blue-100' },
-        { title: 'In Stock Value', val: '₹4.2L', icon: BarChart2, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-        { title: 'Low Stock Alerts', val: '24', icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-100' },
-        { title: 'Out of Stock', val: '8', icon: ShieldAlert, color: 'text-red-600', bg: 'bg-red-100' },
-    ];
-    return (<div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s, i) => (<div key={i} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className={`p-3 rounded-lg ${s.bg}`}>
-              <s.icon size={24} className={s.color}/>
-            </div>
-            <div>
-              <div className="text-sm font-bold text-slate-800">{s.title}</div>
-              <div className="text-2xl font-black text-slate-800">{s.val}</div>
-            </div>
-          </div>))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
-            Recent Activity <span className="text-xs text-blue-600 cursor-pointer">View All</span>
-          </h3>
-          <div className="space-y-4">
-            {[1, 2, 3].map(i => (<div key={i} className="flex gap-3 items-start border-b border-slate-50 pb-3">
-                <div className="mt-1 p-1.5 bg-emerald-100 rounded text-emerald-700"><ArrowDownRight size={14}/></div>
-                <div>
-                  <div className="text-sm font-bold text-slate-700">Stock Received: PO-1029</div>
-                  <div className="text-xs text-slate-800">+150 units of Organic Atta (5kg) added to Main Warehouse</div>
-                </div>
-                <div className="ml-auto text-xs font-mono text-slate-700">10m ago</div>
-              </div>))}
-          </div>
-        </div>
-        
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
-            Low Stock Alerts <span className="text-xs text-amber-600 cursor-pointer">Reorder</span>
-          </h3>
-          <div className="space-y-3">
-            {[
-            { n: 'Fortune Sunflower Oil 1L', cur: 12, min: 20 },
-            { n: 'Aashirvaad Select Atta 5kg', cur: 5, min: 15 },
-            { n: 'Tata Salt 1kg', cur: 40, min: 100 },
-        ].map((item, i) => (<div key={i} className="flex justify-between items-center bg-amber-50/50 p-3 rounded border border-amber-100">
-                  <div className="text-sm font-bold text-slate-700">{item.n}</div>
-                  <div className="text-xs font-bold">
-                     <span className="text-red-600 font-bold">{item.cur}</span> / {item.min} min
-                  </div>
-               </div>))}
-          </div>
-        </div>
-      </div>
-    </div>);
-}
-function ProductsTab() {
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [showAdd, setShowAdd] = useState(false);
-    // Form State
-    const [name, setName] = useState('');
-    const [sku, setSku] = useState('');
-    const [price, setPrice] = useState('');
-    const [stock, setStock] = useState('0');
-    const loadProducts = async () => {
+    // Load items + reports
+    const loadAll = async () => {
         setLoading(true);
         try {
-            const data = await fetchVendure(`
-        query {
-          products(options: { take: 50, sort: { createdAt: DESC } }) {
-            items { id name slug variants { sku price stockOnHand } }
-          }
-        }
-      `);
-            setProducts(data.products.items || []);
-        }
-        catch (e) {
-            console.error(e);
-        }
+            const list = await new ListItemsQuery().execute();
+            setItems(list);
+            setReports(loadReports());
+            setLastRefresh(new Date());
+        } catch (e) { console.error(e); }
         setLoading(false);
     };
-    useEffect(() => { loadProducts(); }, []);
-    const handleAdd = async (e) => {
-        e.preventDefault();
-        try {
-            const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            const prodData = await fetchVendure(`
-        mutation CreateProduct($input: CreateProductInput!) { createProduct(input: $input) { id } }
-      `, { input: { translations: [{ languageCode: "en", name, slug, description: "Added via POS" }] } });
-            const productId = prodData.createProduct.id;
-            await fetchVendure(`
-        mutation CreateProductVariants($input: [CreateProductVariantInput!]!) { createProductVariants(input: $input) { id } }
-      `, { input: [{ productId, sku, price: Math.round(parseFloat(price) * 100), translations: [{ languageCode: "en", name }] }] });
-            setShowAdd(false);
-            setName('');
-            setSku('');
-            setPrice('');
-            loadProducts();
+
+    useEffect(() => {
+        loadAll();
+        // Auto-refresh every 30 seconds for real-time feel
+        const interval = setInterval(() => {
+            invalidateCache('pharma:items');
+            loadAll();
+        }, 30000);
+        // Refresh when window gets focus
+        const onFocus = () => { invalidateCache('pharma:items'); loadAll(); };
+        window.addEventListener('focus', onFocus);
+        // Refresh when localStorage changes (bill saved)
+        const onStorage = (e) => { if (e.key === 'pos_reports') setReports(loadReports()); };
+        window.addEventListener('storage', onStorage);
+        return () => { clearInterval(interval); window.removeEventListener('focus', onFocus); window.removeEventListener('storage', onStorage); };
+    }, []);
+
+    // ── Compute real-time stock status ──
+    const enriched = useMemo(() => {
+        // Count sold quantity per item from pos_reports
+        const soldMap = {};
+        reports.forEach(r => {
+            (r.items || []).forEach(it => {
+                const key = it.id || it.barcode;
+                if (!key) return;
+                soldMap[key] = (soldMap[key] || 0) + (parseFloat(it.qty) || 0);
+            });
+        });
+
+        const now = new Date();
+        return items.map(it => {
+            const maxStock = parseFloat(it.maxStock) || parseFloat(it.maxStkQty) || 0;
+            const minStock = parseFloat(it.minStock) || parseFloat(it.minStkQty) || 10;
+            const sold = soldMap[it.code] || 0;
+            const currentStock = Math.max(0, maxStock - sold);
+            // Expiry check
+            let expiryStatus = 'ok';
+            if (it.expiryDate) {
+                const exp = new Date(it.expiryDate + '-01');
+                const daysToExpiry = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+                if (daysToExpiry <= 0) expiryStatus = 'expired';
+                else if (daysToExpiry <= 90) expiryStatus = 'expiring';
+            }
+            // Stock status
+            let stockStatus = 'ok';
+            if (currentStock === 0) stockStatus = 'out';
+            else if (currentStock <= minStock) stockStatus = 'low';
+            const stockValue = currentStock * (parseFloat(it.costRate) || parseFloat(it.purchaseRate) || 0);
+            return { ...it, currentStock, sold, stockStatus, expiryStatus, stockValue, maxStock, minStock };
+        });
+    }, [items, reports]);
+
+    // Stats
+    const stats = useMemo(() => {
+        const total = enriched.length;
+        const inStock = enriched.filter(i => i.stockStatus === 'ok').length;
+        const low = enriched.filter(i => i.stockStatus === 'low').length;
+        const out = enriched.filter(i => i.stockStatus === 'out').length;
+        const expired = enriched.filter(i => i.expiryStatus === 'expired').length;
+        const expiring = enriched.filter(i => i.expiryStatus === 'expiring').length;
+        const totalStockValue = enriched.reduce((s, i) => s + (i.stockValue || 0), 0);
+        const totalQty = enriched.reduce((s, i) => s + (i.currentStock || 0), 0);
+        const totalSold = enriched.reduce((s, i) => s + (i.sold || 0), 0);
+        return { total, inStock, low, out, expired, expiring, totalStockValue, totalQty, totalSold };
+    }, [enriched]);
+
+    // Filtered items
+    const filtered = enriched.filter(it => {
+        if (search) {
+            const s = search.toLowerCase();
+            if (!(it.itemName || '').toLowerCase().includes(s) &&
+                !String(it.code).includes(search) &&
+                !(it.brand || '').toLowerCase().includes(s) &&
+                !(it.hsnCode || '').includes(search) &&
+                !(it.batchNo || '').toLowerCase().includes(s)) return false;
         }
-        catch (err) {
-            alert(err.message);
-        }
+        if (filterStatus === 'IN_STOCK') return it.stockStatus === 'ok';
+        if (filterStatus === 'LOW') return it.stockStatus === 'low';
+        if (filterStatus === 'OUT') return it.stockStatus === 'out';
+        if (filterStatus === 'EXPIRED') return it.expiryStatus === 'expired';
+        if (filterStatus === 'EXPIRING') return it.expiryStatus === 'expiring';
+        return true;
+    });
+
+    const exportCSV = () => {
+        const headers = "Code,Item Name,Category,Brand,Batch,Expiry,MRP,Sales Rate,Purchase Rate,Max Stock,Min Stock,Sold,Current Stock,Stock Value,Status\n";
+        const rows = enriched.map(i => [
+            i.code, `"${i.itemName}"`, i.category, i.brand || '',
+            i.batchNo || '', i.expiryDate || '',
+            i.mrpRate, i.salesRate, i.purchaseRate,
+            i.maxStock, i.minStock, i.sold, i.currentStock, i.stockValue.toFixed(2),
+            i.stockStatus + (i.expiryStatus !== 'ok' ? '|' + i.expiryStatus : '')
+        ].join(',')).join('\n');
+        const blob = new Blob([headers + rows], { type: 'text/csv' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Inventory_${new Date().toISOString().split('T')[0]}.csv`; a.click();
     };
-    return (<div className="bg-white rounded border border-slate-200 shadow-sm h-full flex flex-col">
-      <div className="p-4 border-b border-slate-200 flex justify-between items-center gap-4">
-         <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-2.5 text-slate-700" size={18}/>
-            <input placeholder="Search by name, SKU, barcode..." className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"/>
-         </div>
-         <div className="flex gap-2">
-            <button className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-lg flex items-center gap-2 text-sm font-bold"><Filter size={16}/> Filter</button>
-            <button onClick={() => setShowAdd(!showAdd)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 text-sm font-bold shadow-sm"><PlusCircle size={16}/> Add Item</button>
-         </div>
-      </div>
 
-      {showAdd && (<form onSubmit={handleAdd} className="p-4 bg-emerald-50 border-b border-emerald-100 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-           <div><label className="text-xs font-bold text-emerald-800">Item Name</label><input required value={name} onChange={e => setName(e.target.value)} className="w-full mt-1 p-2 border border-emerald-200 rounded text-sm"/></div>
-           <div><label className="text-xs font-bold text-emerald-800">SKU / Code</label><input required value={sku} onChange={e => setSku(e.target.value)} className="w-full mt-1 p-2 border border-emerald-200 rounded text-sm"/></div>
-           <div><label className="text-xs font-bold text-emerald-800">Selling Price (₹)</label><input required type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="w-full mt-1 p-2 border border-emerald-200 rounded text-sm"/></div>
-           <div><label className="text-xs font-bold text-emerald-800">Initial Stock</label><input type="number" value={stock} onChange={e => setStock(e.target.value)} className="w-full mt-1 p-2 border border-emerald-200 rounded text-sm"/></div>
-           <button type="submit" className="w-full p-2 bg-emerald-600 text-white rounded font-bold text-sm hover:bg-emerald-700">Save Item</button>
-        </form>)}
+    return (<div className="flex flex-col h-[85vh] bg-slate-50 rounded-xl overflow-hidden border border-slate-300 shadow-sm">
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-xs font-bold text-slate-800 uppercase">
-            <tr>
-              <th className="p-4">Item Details</th>
-              <th className="p-4">SKU / Barcode</th>
-              <th className="p-4">Category</th>
-              <th className="p-4 text-right">Selling Price</th>
-              <th className="p-4 text-center">In Stock</th>
-              <th className="p-4 text-center">Status</th>
-              <th className="p-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {products.map(p => {
-            const variant = p.variants[0] || {};
-            return (<tr key={p.id} className="hover:bg-slate-50">
-                    <td className="p-4">
-                       <div className="font-bold text-sm text-slate-800">{p.name}</div>
-                       <div className="text-xs text-slate-800">Unit: Pcs</div>
-                    </td>
-                    <td className="p-4 text-sm font-mono text-slate-900">{variant.sku}</td>
-                    <td className="p-4 text-sm text-slate-900">Groceries</td>
-                    <td className="p-4 text-sm font-bold text-slate-800 text-right">₹{(variant.price / 100 || 0).toFixed(2)}</td>
-                    <td className="p-4 text-center">
-                       <span className={`px-2 py-1 rounded-full text-xs font-bold ${variant.stockOnHand > 10 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                         {variant.stockOnHand || 0}
-                       </span>
-                    </td>
-                    <td className="p-4 text-center"><span className="text-emerald-500"><CheckCircle size={16} className="mx-auto"/></span></td>
-                    <td className="p-4 text-right">
-                       <button className="p-1.5 text-slate-700 hover:text-blue-600"><Edit size={16}/></button>
-                    </td>
-                 </tr>);
-        })}
-          </tbody>
-        </table>
-      </div>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-[#0f3460] to-[#1a5276] px-6 py-4 flex items-center justify-between shrink-0 border-b border-[#0a2540]">
+            <div>
+                <h1 className="text-xl font-black text-white flex items-center gap-2"><Package size={22}/> Inventory — Real-Time Stock</h1>
+                <p className="text-cyan-200 text-[11px] font-bold mt-0.5 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/>
+                    Live • Last update: {lastRefresh.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    • Auto-refresh every 30s
+                </p>
+            </div>
+            <div className="flex items-center gap-2">
+                <button onClick={()=>{ invalidateCache('pharma:items'); loadAll(); }} className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded border border-white/20 text-[12px] font-bold">
+                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''}/> Refresh
+                </button>
+                <button onClick={exportCSV} className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[12px] font-bold">
+                    <Download size={14}/> Export CSV
+                </button>
+            </div>
+        </div>
+
+        {/* ═══ STATS CARDS ═══ */}
+        <div className="grid grid-cols-8 gap-2 p-3 bg-slate-100 border-b border-slate-300 shrink-0">
+            <StatCard icon={Box} label="Total Items" value={stats.total} color="blue" />
+            <StatCard icon={Layers} label="Total Qty" value={stats.totalQty.toFixed(0)} color="cyan" />
+            <StatCard icon={CheckCircle} label="In Stock" value={stats.inStock} color="emerald" />
+            <StatCard icon={TrendingDown} label="Low Stock" value={stats.low} color="amber" />
+            <StatCard icon={ShieldAlert} label="Out of Stock" value={stats.out} color="red" />
+            <StatCard icon={AlertTriangle} label="Expiring (90d)" value={stats.expiring} color="orange" />
+            <StatCard icon={AlertTriangle} label="Expired" value={stats.expired} color="rose" />
+            <StatCard icon={TrendingUp} label="Stock Value" value={`₹${stats.totalStockValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} color="teal" />
+        </div>
+
+        {/* ═══ FILTERS + SEARCH ═══ */}
+        <div className="bg-white px-4 py-2 flex items-center gap-2 shrink-0 border-b border-slate-300">
+            <div className="relative flex-1 max-w-sm">
+                <Search size={14} className="absolute left-2.5 top-2.5 text-slate-500"/>
+                <input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name, code, brand, HSN, batch..." className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded text-[12px] font-bold outline-none focus:border-[#2980b9] bg-white"/>
+            </div>
+            <div className="flex items-center gap-0.5">
+                {[
+                    { id: 'ALL', label: 'All' },
+                    { id: 'IN_STOCK', label: 'In Stock' },
+                    { id: 'LOW', label: 'Low', color: 'amber' },
+                    { id: 'OUT', label: 'Out', color: 'red' },
+                    { id: 'EXPIRING', label: 'Expiring', color: 'orange' },
+                    { id: 'EXPIRED', label: 'Expired', color: 'rose' },
+                ].map(f => (
+                    <button key={f.id} onClick={()=>setFilterStatus(f.id)} className={`px-3 py-1.5 text-[11px] font-black uppercase border ${filterStatus === f.id ? 'bg-[#2980b9] text-white border-[#1a5276]' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-50'}`}>
+                        {f.label}
+                    </button>
+                ))}
+            </div>
+            <span className="ml-auto text-[11px] font-bold text-slate-700">Showing {filtered.length} / {enriched.length}</span>
+        </div>
+
+        {/* ═══ TABLE ═══ */}
+        <div className="flex-1 overflow-auto bg-white">
+            {loading ? (
+                <div className="flex items-center justify-center h-full text-slate-700 font-bold">Loading inventory...</div>
+            ) : enriched.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-slate-700">
+                    <Box size={40} className="mb-2 text-slate-500"/>
+                    <p className="font-bold">No items in inventory.</p>
+                    <p className="text-[12px] font-bold mt-1">Add items in <span className="text-blue-700">Item Master</span> to see them here.</p>
+                </div>
+            ) : (
+                <table className="w-full text-[11px] border-collapse">
+                    <thead className="bg-[#2c3e50] text-white sticky top-0 z-10 text-[10px] uppercase tracking-wider">
+                        <tr>
+                            <th className="py-2 px-2 text-left border-r border-[#1a2530]">Code</th>
+                            <th className="py-2 px-2 text-left border-r border-[#1a2530]">Item Name</th>
+                            <th className="py-2 px-2 text-left border-r border-[#1a2530]">Category</th>
+                            <th className="py-2 px-2 text-left border-r border-[#1a2530]">Brand</th>
+                            <th className="py-2 px-2 text-left border-r border-[#1a2530]">Batch</th>
+                            <th className="py-2 px-2 text-left border-r border-[#1a2530]">Expiry</th>
+                            <th className="py-2 px-2 text-right border-r border-[#1a2530]">Max</th>
+                            <th className="py-2 px-2 text-right border-r border-[#1a2530]">Sold</th>
+                            <th className="py-2 px-2 text-right border-r border-[#1a2530]">Stock</th>
+                            <th className="py-2 px-2 text-right border-r border-[#1a2530]">MRP</th>
+                            <th className="py-2 px-2 text-right border-r border-[#1a2530]">Rate</th>
+                            <th className="py-2 px-2 text-right border-r border-[#1a2530]">Value</th>
+                            <th className="py-2 px-2 text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody className="font-bold text-slate-900">
+                        {filtered.map((it, i) => (<tr key={it.id} className={`border-b border-slate-200 hover:bg-blue-50 ${it.stockStatus === 'out' ? 'bg-red-50' : it.stockStatus === 'low' ? 'bg-amber-50' : it.expiryStatus === 'expired' ? 'bg-rose-50' : it.expiryStatus === 'expiring' ? 'bg-orange-50' : i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-blue-700 font-mono font-black">{it.code}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-200">
+                                <div>{it.itemName}</div>
+                                {it.tamilName && <div className="text-[9px] text-slate-700">{it.tamilName}</div>}
+                            </td>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-[10px]">{it.category}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-[10px]">{it.brand || '-'}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-[10px] font-mono">{it.batchNo || '-'}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-200">
+                                {it.expiryDate ? (
+                                    <span className={`text-[10px] font-black ${it.expiryStatus === 'expired' ? 'text-rose-700' : it.expiryStatus === 'expiring' ? 'text-orange-700' : 'text-slate-900'}`}>
+                                        {new Date(it.expiryDate + '-01').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })}
+                                        {it.expiryStatus === 'expired' && ' ⚠'}
+                                        {it.expiryStatus === 'expiring' && ' ⚡'}
+                                    </span>
+                                ) : '-'}
+                            </td>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-right text-slate-700">{it.maxStock}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-right text-blue-700 font-black">{it.sold}</td>
+                            <td className={`py-1.5 px-2 border-r border-slate-200 text-right font-black text-[13px] ${it.stockStatus === 'out' ? 'text-red-700' : it.stockStatus === 'low' ? 'text-amber-700' : 'text-emerald-700'}`}>{it.currentStock}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-right">₹{parseFloat(it.mrpRate).toFixed(2)}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-right">₹{parseFloat(it.salesRate).toFixed(2)}</td>
+                            <td className="py-1.5 px-2 border-r border-slate-200 text-right text-teal-700 font-black">₹{it.stockValue.toFixed(2)}</td>
+                            <td className="py-1.5 px-2 text-center">
+                                <StatusBadge stockStatus={it.stockStatus} expiryStatus={it.expiryStatus}/>
+                            </td>
+                        </tr>))}
+                        {filtered.length === 0 && <tr><td colSpan={13} className="py-10 text-center text-slate-700 font-bold">No items match your filter.</td></tr>}
+                    </tbody>
+                </table>
+            )}
+        </div>
+
+        {/* Footer info */}
+        <div className="bg-[#2c3e50] text-white px-4 py-1.5 text-[10px] font-bold shrink-0 flex items-center justify-between">
+            <span>🟢 Real-time • Updates on bill save, tab focus, or every 30 seconds</span>
+            <span>Total Stock Value: ₹{stats.totalStockValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        </div>
     </div>);
 }
-function StockLevelsTab() {
-    const data = [
-        { name: 'Basmati Rice Premium 25kg', cur: 140, rsv: 10, dmg: 0, loc: 'Main WH', status: 'Healthy' },
-        { name: 'Toor Dal 1kg', cur: 15, rsv: 2, dmg: 1, loc: 'Store Front', status: 'Low' },
-    ];
-    return <GenericTable title="Real-time Stock Levels" cols={['Item', 'Location', 'Available', 'Reserved', 'Damaged', 'Status']} data={data} renderRow={(row, i) => (<tr key={i} className="border-b">
-         <td className="p-3 text-sm font-bold text-slate-700">{row.name}</td>
-         <td className="p-3 text-sm text-slate-800">{row.loc}</td>
-         <td className="p-3 font-bold">{row.cur}</td>
-         <td className="p-3 text-amber-600">{row.rsv}</td>
-         <td className="p-3 text-red-500">{row.dmg}</td>
-         <td className="p-3"><span className={`px-2 py-1 text-xs rounded-full ${row.status === 'Healthy' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{row.status}</span></td>
-      </tr>)}/>;
-}
-function POTab() {
-    return <Placeholder icon={FileText} title="Purchase Orders" desc="Raise POs, track expected delivery dates, and manage vendor orders."/>;
-}
-function GoodsReceiveTab() {
-    return <Placeholder icon={Truck} title="Goods Receiving Note (GRN)" desc="Record incoming stock against POs, capture batch numbers, and expiry dates."/>;
-}
-function SuppliersTab() {
-    return <Placeholder icon={Layers} title="Supplier Directory" desc="Manage vendor contacts, GST details, lead times, and payment terms."/>;
-}
-function AdjustmentsTab() {
-    return <Placeholder icon={Archive} title="Stock Adjustments" desc="Correct discrepancies, mark damages, or record internal consumption."/>;
-}
-function TransfersTab() {
-    return <Placeholder icon={Repeat} title="Warehouse Transfers" desc="Move stock between main warehouse and retail storefronts."/>;
-}
-function ReturnsTab() {
-    return <Placeholder icon={ArrowDownRight} title="Returns Management" desc="Process Purchase Returns (RTV) and Sales Returns."/>;
-}
-function BatchTab() {
-    return <Placeholder icon={Box} title="Batch & Expiry Tracking" desc="Monitor FIFO/FEFO expiry dates for FMCG items to minimize wastage."/>;
-}
-function ReportsTab() {
-    return <Placeholder icon={BarChart2} title="Inventory Reports" desc="Generate valuation reports, slow-moving analytics, and stock ledgers."/>;
-}
-function Placeholder({ icon: Icon, title, desc }) {
-    return (<div className="h-full flex flex-col items-center justify-center p-8 bg-white rounded border border-slate-200 border-dashed text-center">
-       <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100"><Icon size={40} className="text-slate-900"/></div>
-       <h3 className="text-xl font-bold text-slate-700 mb-2">{title}</h3>
-       <p className="text-slate-800 max-w-md">{desc}</p>
-       <button className="mt-6 px-4 py-2 bg-slate-900 text-white font-bold rounded shadow-sm text-sm">Configure Module</button>
+
+function StatCard({ icon: Icon, label, value, color }) {
+    const colors = {
+        blue: 'bg-blue-50 text-blue-700 border-blue-200',
+        cyan: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+        emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        amber: 'bg-amber-50 text-amber-700 border-amber-200',
+        red: 'bg-red-50 text-red-700 border-red-200',
+        orange: 'bg-orange-50 text-orange-700 border-orange-200',
+        rose: 'bg-rose-50 text-rose-700 border-rose-200',
+        teal: 'bg-teal-50 text-teal-700 border-teal-200',
+    };
+    return (<div className={`p-2 rounded border ${colors[color] || colors.blue} flex flex-col`}>
+        <div className="flex items-center gap-1.5 mb-0.5">
+            <Icon size={12}/>
+            <span className="text-[9px] font-black uppercase tracking-wider">{label}</span>
+        </div>
+        <span className="text-[18px] font-black leading-tight">{value}</span>
     </div>);
 }
-function GenericTable({ title, cols, data, renderRow }) {
-    return (<div className="bg-white rounded border border-slate-200 flex flex-col h-full">
-        <div className="p-4 border-b border-slate-200 font-bold text-slate-800">{title}</div>
-        <table className="w-full text-left">
-           <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-800 uppercase">
-             <tr>{cols.map((c) => <th key={c} className="p-3">{c}</th>)}</tr>
-           </thead>
-           <tbody>{data.map(renderRow)}</tbody>
-        </table>
-     </div>);
+
+function StatusBadge({ stockStatus, expiryStatus }) {
+    if (expiryStatus === 'expired') return <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-rose-600 text-white">EXPIRED</span>;
+    if (stockStatus === 'out') return <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-red-600 text-white">OUT</span>;
+    if (stockStatus === 'low') return <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-amber-500 text-white">LOW</span>;
+    if (expiryStatus === 'expiring') return <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-orange-500 text-white">EXPIRING</span>;
+    return <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-emerald-600 text-white">OK</span>;
 }

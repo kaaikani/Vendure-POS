@@ -5,6 +5,7 @@ import { PharmaPurchase } from '../entities/pharma-purchase.entity';
 import { PharmaPayment } from '../entities/pharma-payment.entity';
 import { PharmaReceipt } from '../entities/pharma-receipt.entity';
 import { PharmaToken } from '../entities/pharma-token.entity';
+import { PharmaSale } from '../entities/pharma-sale.entity';
 
 @Injectable()
 export class PharmaService {
@@ -112,6 +113,36 @@ export class PharmaService {
         const t = await repo.findOne({ where: { id: parseInt(id) } });
         if (!t) throw new Error('Token not found.');
         await repo.remove(t);
+        return true;
+    }
+
+    // ── SALES ──
+    async listSales(ctx, fromDate, toDate) {
+        const repo = this.connection.getRepository(ctx, PharmaSale);
+        const where = {};
+        if (fromDate && toDate) {
+            // Simple SQLite-compatible filter via raw query if needed
+            const all = await repo.find({ order: { createdAt: 'DESC' } });
+            return all.filter(s => s.billDate >= fromDate && s.billDate <= toDate);
+        }
+        return repo.find({ order: { createdAt: 'DESC' }, take: 500 });
+    }
+
+    async getSale(ctx, id) {
+        return this.connection.getRepository(ctx, PharmaSale).findOne({ where: { id: parseInt(id) } });
+    }
+
+    async createSale(ctx, input) {
+        const repo = this.connection.getRepository(ctx, PharmaSale);
+        const sale = new PharmaSale({ ...input, itemsJson: JSON.stringify(input.items || []) });
+        return repo.save(sale);
+    }
+
+    async deleteSale(ctx, id) {
+        const repo = this.connection.getRepository(ctx, PharmaSale);
+        const s = await repo.findOne({ where: { id: parseInt(id) } });
+        if (!s) throw new Error('Sale not found.');
+        await repo.remove(s);
         return true;
     }
 }

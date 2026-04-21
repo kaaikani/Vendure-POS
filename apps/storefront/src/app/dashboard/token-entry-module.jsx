@@ -199,14 +199,14 @@ ${total>0?`<p style="font-size:16px;font-weight:900;margin-top:12px">₹${total.
                                 </tr>
                             ) : (
                                 filteredTokens.map(t => (
-                                    <tr key={t.id} onClick={() => loadRecord(t)} className={`border-b border-[#e0e6ec] h-[26px] cursor-pointer text-[12px] ${selectedId === t.id ? 'bg-yellow-100' : 'bg-white hover:bg-blue-50'}`}>
+                                    <tr key={t.id} onClick={() => loadRecord(t)} className={`border-b border-[#e0e6ec] h-[26px] cursor-pointer text-[12px] text-slate-900 ${selectedId === t.id ? 'bg-yellow-100' : 'bg-white hover:bg-blue-50'}`}>
                                         <td className="py-1 px-2 border-r border-[#e0e6ec] text-slate-900 font-mono font-bold">{String(t.id).slice(-6)}</td>
-                                        <td className="py-1 px-2 border-r border-[#e0e6ec] font-bold">{new Date(t.tokenDate).toLocaleDateString('en-IN')}</td>
-                                        <td className="py-1 px-2 border-r border-[#e0e6ec] font-black">{t.tokenNo}</td>
-                                        <td className="py-1 px-2 border-r border-[#e0e6ec] font-bold uppercase">{t.patientName}</td>
-                                        <td className="py-1 px-2 border-r border-[#e0e6ec]">{t.address}</td>
-                                        <td className="py-1 px-2 border-r border-[#e0e6ec]">{t.cellNo}</td>
-                                        <td className="py-1 px-2 text-right font-bold">₹{(t.total || 0).toFixed(2)}</td>
+                                        <td className="py-1 px-2 border-r border-[#e0e6ec] text-slate-900 font-bold">{new Date(t.tokenDate).toLocaleDateString('en-IN')}</td>
+                                        <td className="py-1 px-2 border-r border-[#e0e6ec] text-slate-900 font-black">{t.tokenNo}</td>
+                                        <td className="py-1 px-2 border-r border-[#e0e6ec] text-slate-900 font-bold uppercase">{t.patientName}</td>
+                                        <td className="py-1 px-2 border-r border-[#e0e6ec] text-slate-900">{t.address}</td>
+                                        <td className="py-1 px-2 border-r border-[#e0e6ec] text-slate-900">{t.cellNo}</td>
+                                        <td className="py-1 px-2 text-right text-slate-900 font-bold">₹{(t.total || 0).toFixed(2)}</td>
                                     </tr>
                                 ))
                             )}

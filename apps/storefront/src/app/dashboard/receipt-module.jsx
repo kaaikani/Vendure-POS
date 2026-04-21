@@ -219,13 +219,13 @@ export default function ReceiptModule() {
                             </tr>
                         ) : rows.map((r, i) => (<tr key={i} className="h-[22px] border-b border-[#c0c0c0] bg-white">
                             <td className="w-6 text-center text-[#2980b9] font-black border-r border-[#c0c0c0]">{i === rows.length-1 ? '▶*' : ''}</td>
-                            <td className="p-0 border-r border-[#c0c0c0]"><input type="text" value={r.billRefNo} onChange={e=>updateRow(i,'billRefNo',e.target.value)} className="w-full h-[22px] px-1 text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
-                            <td className="p-0 border-r border-[#c0c0c0]"><input type="text" value={r.refNo} onChange={e=>updateRow(i,'refNo',e.target.value)} className="w-full h-[22px] px-1 text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
-                            <td className="p-0 border-r border-[#c0c0c0]"><input type="date" value={r.refDate} onChange={e=>updateRow(i,'refDate',e.target.value)} className="w-full h-[22px] px-1 text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
-                            <td className="p-0 border-r border-[#c0c0c0]"><input type="number" value={r.billAmt} onChange={e=>updateRow(i,'billAmt',e.target.value)} className="w-full h-[22px] px-1 text-right text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
+                            <td className="p-0 border-r border-[#c0c0c0]"><input type="text" value={r.billRefNo || ''} onChange={e=>updateRow(i,'billRefNo',e.target.value)} className="w-full h-[22px] px-1 text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
+                            <td className="p-0 border-r border-[#c0c0c0]"><input type="text" value={r.refNo || ''} onChange={e=>updateRow(i,'refNo',e.target.value)} className="w-full h-[22px] px-1 text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
+                            <td className="p-0 border-r border-[#c0c0c0]"><input type="date" value={r.refDate || ''} onChange={e=>updateRow(i,'refDate',e.target.value)} className="w-full h-[22px] px-1 text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
+                            <td className="p-0 border-r border-[#c0c0c0]"><input type="number" value={r.billAmt || ''} onChange={e=>updateRow(i,'billAmt',e.target.value)} className="w-full h-[22px] px-1 text-right text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
                             <td className="p-0 border-r border-[#c0c0c0] text-right px-2 font-bold">{r.balance}</td>
-                            <td className="p-0 border-r border-[#c0c0c0]"><input type="number" value={r.paidAmt} onChange={e=>updateRow(i,'paidAmt',e.target.value)} className="w-full h-[22px] px-1 text-right text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
-                            <td className="p-0"><input type="number" value={r.discount} onChange={e=>updateRow(i,'discount',e.target.value)} className="w-full h-[22px] px-1 text-right text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
+                            <td className="p-0 border-r border-[#c0c0c0]"><input type="number" value={r.paidAmt || ''} onChange={e=>updateRow(i,'paidAmt',e.target.value)} className="w-full h-[22px] px-1 text-right text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
+                            <td className="p-0"><input type="number" value={r.discount || ''} onChange={e=>updateRow(i,'discount',e.target.value)} className="w-full h-[22px] px-1 text-right text-[11px] font-bold outline-none bg-white focus:bg-yellow-50"/></td>
                         </tr>))}
                         {/* Empty space below */}
                         <tr><td colSpan={8} className="h-[120px] bg-[#e8eef5]"></td></tr>

@@ -235,6 +235,60 @@ export const pharmaApiExtensions = gql`
         total: Float
     }
 
+    type PharmaSale implements Node {
+        id: ID!
+        createdAt: DateTime!
+        updatedAt: DateTime!
+        billNo: String!
+        billDate: String!
+        billTime: String!
+        saleType: String!
+        bookNo: String!
+        billRef: String!
+        customerName: String!
+        customerPhone: String!
+        customerAddress: String!
+        salesMan: String!
+        itemsJson: String!
+        subtotal: Float!
+        taxAmount: Float!
+        discount: Float!
+        transportCharges: Float!
+        grandTotal: Float!
+        cashAmount: Float!
+        upiAmount: Float!
+        cardAmount: Float!
+        receivedAmount: Float!
+        balanceDue: Float!
+        changeReturned: Float!
+        remarks: String!
+    }
+    input PharmaSaleInput {
+        billNo: String!
+        billDate: String!
+        billTime: String
+        saleType: String
+        bookNo: String
+        billRef: String
+        customerName: String
+        customerPhone: String
+        customerAddress: String
+        salesMan: String
+        items: [JSON!]
+        subtotal: Float
+        taxAmount: Float
+        discount: Float
+        transportCharges: Float
+        grandTotal: Float
+        cashAmount: Float
+        upiAmount: Float
+        cardAmount: Float
+        receivedAmount: Float
+        balanceDue: Float
+        changeReturned: Float
+        remarks: String
+    }
+
     extend type Query {
         pharmaItems: [PharmaItem!]!
         pharmaItem(id: ID!): PharmaItem
@@ -242,6 +296,8 @@ export const pharmaApiExtensions = gql`
         pharmaPayments: [PharmaPayment!]!
         pharmaReceipts: [PharmaReceipt!]!
         pharmaTokens(tokenDate: String): [PharmaToken!]!
+        pharmaSales(fromDate: String, toDate: String): [PharmaSale!]!
+        pharmaSale(id: ID!): PharmaSale
     }
 
     extend type Mutation {
@@ -260,5 +316,8 @@ export const pharmaApiExtensions = gql`
 
         createPharmaToken(input: PharmaTokenInput!): PharmaToken!
         deletePharmaToken(id: ID!): Boolean!
+
+        createPharmaSale(input: PharmaSaleInput!): PharmaSale!
+        deletePharmaSale(id: ID!): Boolean!
     }
 `;
