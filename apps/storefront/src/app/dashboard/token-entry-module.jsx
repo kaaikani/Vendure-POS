@@ -61,7 +61,7 @@ export default function TokenEntryModule() {
         const w = window.open('', '', 'width=400,height=500');
         if (w) {
             w.document.write(`<html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',sans-serif;padding:20px;text-align:center;max-width:300px;margin:0 auto}</style></head><body onload="window.print()">
-<h2 style="font-weight:900;letter-spacing:2px"># HASHTAG</h2>
+<h2 style="font-weight:900;letter-spacing:2px">AVS ECOM</h2>
 <p style="font-size:10px;color:#666;letter-spacing:2px;margin-top:4px">MEDICAL & PHARMACY</p>
 <hr style="margin:12px 0;border:1px dashed #ccc">
 <h1 style="font-size:48px;font-weight:900;color:#0f3460">Token ${tokenNo}</h1>

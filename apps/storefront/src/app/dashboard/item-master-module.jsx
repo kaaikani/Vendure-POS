@@ -150,7 +150,7 @@ export default function ItemMasterModule() {
     return (<div className="flex flex-col h-[85vh] rounded-md overflow-hidden font-sans shadow-xl" style={{ background: '#b8dce2' }}>
         {/* Title bar */}
         <div className="h-6 flex items-center px-2 shrink-0 bg-gradient-to-r from-[#1a5276] to-[#2980b9]">
-            <span className="text-white text-[11px] font-bold">Item Definition - HASHTAG PRIVATE LIMITED 2026-2027</span>
+            <span className="text-white text-[11px] font-bold">Item Definition - AVS ECOM PRIVATE LIMITED 2026-2027</span>
         </div>
 
         <div className="flex-1 flex overflow-hidden">

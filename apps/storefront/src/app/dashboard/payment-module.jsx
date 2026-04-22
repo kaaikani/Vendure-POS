@@ -223,7 +223,7 @@ export default function PaymentModule() {
     return (<div className="flex flex-col h-[85vh] rounded-md overflow-hidden font-sans shadow-xl" style={{ background: '#d4e6f1' }}>
         {/* Title bar */}
         <div className="h-6 flex items-center px-2 shrink-0 bg-gradient-to-r from-[#1a5276] to-[#2980b9]">
-            <span className="text-white text-[11px] font-bold">Payment - HASHTAG PRIVATE LIMITED 2026-2027</span>
+            <span className="text-white text-[11px] font-bold">Payment - AVS ECOM PRIVATE LIMITED 2026-2027</span>
         </div>
 
         {/* Header form */}

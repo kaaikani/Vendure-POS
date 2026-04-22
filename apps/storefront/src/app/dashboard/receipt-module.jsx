@@ -91,7 +91,7 @@ export default function ReceiptModule() {
     const handlePrint = () => {
         const w = window.open('', '', 'width=500,height=600');
         if (w) {
-            w.document.write(`<html><body style="font-family:Arial;padding:20px"><h2 style="text-align:center"># HASHTAG</h2><hr><h3 style="text-align:center;color:#1a5276">RECEIPT</h3><p>Doc No: <b>${docNo}</b> | Date: ${docDate}</p><p>Acc Head: <b>${accHead}</b></p><p>Mode: ${mode} | Amount: <b>₹${recAmount}</b></p><hr><p>Narration: ${narration1} ${narration2}</p><p style="text-align:center;margin-top:20px">Thank You!</p></body></html>`);
+            w.document.write(`<html><body style="font-family:Arial;padding:20px"><h2 style="text-align:center">AVS ECOM</h2><hr><h3 style="text-align:center;color:#1a5276">RECEIPT</h3><p>Doc No: <b>${docNo}</b> | Date: ${docDate}</p><p>Acc Head: <b>${accHead}</b></p><p>Mode: ${mode} | Amount: <b>₹${recAmount}</b></p><hr><p>Narration: ${narration1} ${narration2}</p><p style="text-align:center;margin-top:20px">Thank You!</p></body></html>`);
             w.document.close(); w.print();
         }
     };
@@ -119,7 +119,7 @@ export default function ReceiptModule() {
 
         {/* Title bar */}
         <div className="h-[22px] flex items-center px-2 shrink-0 bg-gradient-to-r from-[#1a5276] to-[#2980b9] relative">
-            <span className="text-white text-[11px] font-bold">Receipt - HASHTAG PRIVATE LIMITED 2026-2027</span>
+            <span className="text-white text-[11px] font-bold">Receipt - AVS ECOM PRIVATE LIMITED 2026-2027</span>
             <div className="absolute right-1 top-0 flex items-center gap-0">
                 <button className="text-white hover:bg-slate-600 w-5 h-[20px] flex items-center justify-center"><Minus size={11}/></button>
                 <button className="text-white hover:bg-slate-600 w-5 h-[20px] flex items-center justify-center"><Square size={9}/></button>

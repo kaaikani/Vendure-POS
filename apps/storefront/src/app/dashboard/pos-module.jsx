@@ -250,7 +250,7 @@ table{width:100%;border-collapse:collapse}
 <body onload="window.print()">
 
 <div class="center" style="border-bottom:2px dashed #94a3b8;padding-bottom:12px;margin-bottom:10px">
-  <h1 style="font-size:24px;font-weight:900;letter-spacing:3px"># HASHTAG</h1>
+  <h1 style="font-size:24px;font-weight:900;letter-spacing:3px">AVS ECOM</h1>
   <p style="font-size:10px;color:#64748b;letter-spacing:3px;text-transform:uppercase;margin-top:2px">MEDICAL & PHARMACY</p>
   <p style="font-size:11px;color:#475569;margin-top:6px">123, Main Road, Your City - 600001</p>
   <p style="font-size:11px;color:#475569">Ph: +91 98765 43210 | GSTIN: 33XXXXX1234X1ZX</p>
@@ -326,7 +326,7 @@ table{width:100%;border-collapse:collapse}
 <div class="center" style="margin-top:20px;padding-top:12px;border-top:2px dashed #94a3b8;font-size:11px;color:#94a3b8">
   <p style="font-weight:700;color:#475569;margin-bottom:4px">🙏 Thank You! Visit Again 🙏</p>
   <p style="margin-top:4px">Items: ${lastOrder.items.length} | Total Qty: ${totalQty}</p>
-  <p style="margin-top:6px;font-size:9px;letter-spacing:1px">Powered by HASHTAG Medical POS</p>
+  <p style="margin-top:6px;font-size:9px;letter-spacing:1px">Powered by AVS ECOM Medical POS</p>
 </div>
 
 </body></html>`;

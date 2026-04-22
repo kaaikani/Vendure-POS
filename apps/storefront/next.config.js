@@ -1,6 +1,10 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig = {
+    turbopack: { root: path.resolve(__dirname, '../..') },
     cacheComponents: true,
     images: {
         // This is necessary to display images from your local Vendure instance

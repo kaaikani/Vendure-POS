@@ -32,6 +32,8 @@ export const config: VendureConfig = {
         ...(IS_DEV ? {
             adminApiDebug: true,
             shopApiDebug: true,
+            adminApiPlayground: { settings: { 'request.credentials': 'include' } },
+            shopApiPlayground: { settings: { 'request.credentials': 'include' } },
         } : {}),
     },
     authOptions: {
@@ -48,7 +50,7 @@ export const config: VendureConfig = {
         type: 'better-sqlite3',
         // See the README.md "Migrations" section for an explanation of
         // the `synchronize` and `migrations` options.
-        synchronize: false,
+        synchronize: IS_DEV,
         migrations: [path.join(__dirname, './migrations/*.+(js|ts)')],
         logging: false,
         database: path.join(__dirname, '../vendure.sqlite'),

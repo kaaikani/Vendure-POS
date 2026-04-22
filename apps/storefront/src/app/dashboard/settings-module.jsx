@@ -1,7 +1,33 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Building2, Edit3, CheckCircle, UserPlus, Database, KeyRound, Settings as SettingsIcon, ScanLine, Printer, X, Save, Download, Minus, Square, Eye, EyeOff, ShieldCheck, User as UserIcon, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
-import { PosListUsersQuery, PosCreateUserCommand, PosUpdateUserCommand, PosDeleteUserCommand } from '../../core/queries/auth.query';
+import { Building2, Edit3, CheckCircle, UserPlus, Database, KeyRound, Settings as SettingsIcon, ScanLine, Printer, X, Save, Download, Minus, Square, Eye, EyeOff, ShieldCheck, User as UserIcon, Trash2, ToggleLeft, ToggleRight, Lock, RefreshCw } from 'lucide-react';
+import { PosListUsersQuery, PosCreateUserCommand, PosUpdateUserCommand, PosDeleteUserCommand, ListRolesQuery, GetRoleQuery, UpdateRolePermissionsCommand } from '../../core/queries/auth.query';
+
+const PERMISSION_LIST = [
+    'Authenticated', 'SuperAdmin', 'Owner', 'Public',
+    'CreateAdministrator', 'ReadAdministrator', 'UpdateAdministrator', 'DeleteAdministrator',
+    'CreateCatalog', 'ReadCatalog', 'UpdateCatalog', 'DeleteCatalog',
+    'CreateSettings', 'ReadSettings', 'UpdateSettings', 'DeleteSettings',
+    'CreateCustomer', 'ReadCustomer', 'UpdateCustomer', 'DeleteCustomer',
+    'CreateCustomerGroup', 'ReadCustomerGroup', 'UpdateCustomerGroup', 'DeleteCustomerGroup',
+    'CreateFacet', 'ReadFacet', 'UpdateFacet', 'DeleteFacet',
+    'CreateOrder', 'ReadOrder', 'UpdateOrder', 'DeleteOrder',
+    'CreatePaymentMethod', 'ReadPaymentMethod', 'UpdatePaymentMethod', 'DeletePaymentMethod',
+    'CreatePromotion', 'ReadPromotion', 'UpdatePromotion', 'DeletePromotion',
+    'CreateShippingMethod', 'ReadShippingMethod', 'UpdateShippingMethod', 'DeleteShippingMethod',
+    'CreateTag', 'ReadTag', 'UpdateTag', 'DeleteTag',
+    'CreateTaxCategory', 'ReadTaxCategory', 'UpdateTaxCategory', 'DeleteTaxCategory',
+    'CreateTaxRate', 'ReadTaxRate', 'UpdateTaxRate', 'DeleteTaxRate',
+    'CreateSeller', 'ReadSeller', 'UpdateSeller', 'DeleteSeller',
+    'CreateChannel', 'ReadChannel', 'UpdateChannel', 'DeleteChannel',
+    'CreateStockLocation', 'ReadStockLocation', 'UpdateStockLocation', 'DeleteStockLocation',
+    'CreateSystem', 'ReadSystem', 'UpdateSystem', 'DeleteSystem',
+    'CreateZone', 'ReadZone', 'UpdateZone', 'DeleteZone',
+    'CreateAsset', 'ReadAsset', 'UpdateAsset', 'DeleteAsset',
+    'CreateCollection', 'ReadCollection', 'UpdateCollection', 'DeleteCollection',
+    'CreateCountry', 'ReadCountry', 'UpdateCountry', 'DeleteCountry',
+    'CreateProduct', 'ReadProduct', 'UpdateProduct', 'DeleteProduct',
+];
 
 const COMPANY_KEY = 'pharma_companies';
 const ACTIVE_COMPANY_KEY = 'pharma_active_company';
@@ -51,10 +77,52 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
     const [showUserPass, setShowUserPass] = useState(false);
     const [userLoading, setUserLoading] = useState(false);
 
+    // Role & Permissions state
+    const [roles, setRoles] = useState([]);
+    const [rolesLoading, setRolesLoading] = useState(false);
+    const [rolesError, setRolesError] = useState('');
+    const [selectedRoleId, setSelectedRoleId] = useState(null);
+    const [selectedRolePerms, setSelectedRolePerms] = useState([]);
+    const [selectedRoleCode, setSelectedRoleCode] = useState('');
+    const [selectedRoleDesc, setSelectedRoleDesc] = useState('');
+    const [roleSaving, setRoleSaving] = useState(false);
+
     // Load users when user-creation section is active
     useEffect(() => {
         if (section === 'user-creation') fetchUsers();
+        if (section === 'role-permissions') fetchRoles();
     }, [section]);
+
+    // ── Role & Permissions ──
+    const fetchRoles = async () => {
+        setRolesLoading(true); setRolesError('');
+        try {
+            const list = await new ListRolesQuery().execute();
+            setRoles(Array.isArray(list) ? list : []);
+            if (list.length === 0) setRolesError('No roles found. Create one in Vendure dashboard.');
+        } catch (e) { setRolesError(e.message || 'Failed to load roles.'); setRoles([]); }
+        setRolesLoading(false);
+    };
+
+    const selectRole = async (r) => {
+        setSelectedRoleId(r.id); setSelectedRoleCode(r.code);
+        setSelectedRoleDesc(r.description || ''); setSelectedRolePerms(r.permissions || []);
+    };
+
+    const togglePerm = (perm) => {
+        setSelectedRolePerms(prev => prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]);
+    };
+
+    const handleSaveRolePerms = async () => {
+        if (!selectedRoleId) return;
+        setRoleSaving(true);
+        try {
+            await new UpdateRolePermissionsCommand().execute(selectedRoleId, selectedRolePerms, selectedRoleDesc);
+            await fetchRoles();
+            alert(`Permissions for role "${selectedRoleCode}" updated.`);
+        } catch (e) { alert(e.message); }
+        setRoleSaving(false);
+    };
 
     const fetchUsers = async () => {
         setUserLoading(true);
@@ -183,21 +251,14 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
     const lbl = "text-[12px] font-bold text-slate-900";
 
     const sections = [
-        { id: 'company-creation', label: 'Company Creation', icon: Building2 },
-        { id: 'company-updation', label: 'Company Updation', icon: Edit3 },
-        { id: 'company-selection', label: 'Company Selection', icon: CheckCircle },
         { id: 'user-creation', label: 'User Creation', icon: UserPlus },
-        { id: 'database-backup', label: 'DataBase BackUp', icon: Database },
-        { id: 'change-password', label: 'Change Password', icon: KeyRound },
-        { id: 'config-settings', label: 'Config Settings', icon: SettingsIcon },
         { id: 'barcode-design', label: 'Barcode Design', icon: ScanLine },
-        { id: 'print-settings', label: 'Print Settings', icon: Printer },
     ];
 
     return (<div className="flex flex-col h-[85vh] rounded-md overflow-hidden font-sans shadow-xl border border-slate-400" style={{background:'#eaf2f8'}}>
         {/* Title bar */}
         <div className="h-[24px] flex items-center justify-between px-2 shrink-0 bg-gradient-to-r from-[#1a5276] to-[#2980b9]">
-            <span className="text-white text-[12px] font-bold">Settings - HASHTAG PRIVATE LIMITED 2026-2027</span>
+            <span className="text-white text-[12px] font-bold">Settings - AVS ECOM PRIVATE LIMITED 2026-2027</span>
             <div className="flex items-center gap-0">
                 <button className="w-5 h-[20px] text-white hover:bg-slate-600 flex items-center justify-center"><Minus size={11}/></button>
                 <button className="w-5 h-[20px] text-white hover:bg-slate-600 flex items-center justify-center"><Square size={9}/></button>
@@ -221,73 +282,6 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
 
             {/* Content area */}
             <div className="flex-1 p-6 overflow-auto bg-[#eaf2f8]">
-
-                {/* COMPANY CREATION */}
-                {section === 'company-creation' && (<div>
-                    <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><Building2 size={18}/> Company Creation</h2>
-                    <div className="bg-white border border-[#7a9ca8] p-5 max-w-2xl space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div><label className={`${lbl} block mb-1`}>Company Name *</label><input type="text" value={form.name || ''} onChange={e=>setForm({...form,name:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div><label className={`${lbl} block mb-1`}>GST Number</label><input type="text" value={form.gst || ''} onChange={e=>setForm({...form,gst:e.target.value.toUpperCase()})} className={`${inp} w-full`}/></div>
-                            <div><label className={`${lbl} block mb-1`}>Phone</label><input type="tel" value={form.phone || ''} onChange={e=>setForm({...form,phone:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div><label className={`${lbl} block mb-1`}>Email</label><input type="email" value={form.email || ''} onChange={e=>setForm({...form,email:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div className="col-span-2"><label className={`${lbl} block mb-1`}>Address</label><input type="text" value={form.address || ''} onChange={e=>setForm({...form,address:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div><label className={`${lbl} block mb-1`}>State</label><input type="text" value={form.state || ''} onChange={e=>setForm({...form,state:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div><label className={`${lbl} block mb-1`}>Pincode</label><input type="text" value={form.pincode || ''} onChange={e=>setForm({...form,pincode:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div><label className={`${lbl} block mb-1`}>Financial Year</label><input type="text" value={form.financialYear || ''} onChange={e=>setForm({...form,financialYear:e.target.value})} className={`${inp} w-full`}/></div>
-                        </div>
-                        <div className="pt-3 border-t border-[#c0d0d8]">
-                            <button onClick={handleCompanyCreate} className="bg-[#2980b9] hover:bg-[#1a5276] text-white font-black px-6 py-1.5 text-[13px] border border-[#1a5276] flex items-center gap-2"><Save size={14}/> Create Company</button>
-                        </div>
-                    </div>
-                </div>)}
-
-                {/* COMPANY UPDATION */}
-                {section === 'company-updation' && (<div>
-                    <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><Edit3 size={18}/> Company Updation</h2>
-                    <div className="bg-white border border-[#7a9ca8] p-4 max-w-3xl">
-                        <h3 className="text-[11px] font-black uppercase text-slate-900 mb-2">Select company to edit:</h3>
-                        <div className="grid grid-cols-3 gap-2 mb-4 max-h-40 overflow-auto">
-                            {companies.map(c => (<button key={c.id} onClick={()=>loadCompanyToForm(c)} className={`border p-2 text-left text-[11px] font-bold ${editingId===c.id?'bg-[#2980b9] text-white border-[#1a5276]':'bg-white border-[#c0d0d8] hover:bg-[#eaf3f8]'}`}>
-                                <div className="font-black">{c.name}</div>
-                                <div className="text-[10px] opacity-70">{c.gst || 'No GST'}</div>
-                            </button>))}
-                            {companies.length === 0 && <p className="col-span-3 text-center text-slate-700 font-bold py-4">No companies yet. Create one first.</p>}
-                        </div>
-                        {editingId && (<div className="border-t border-[#c0d0d8] pt-4 space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div><label className={`${lbl} block mb-1`}>Name</label><input type="text" value={form.name || ''} onChange={e=>setForm({...form,name:e.target.value})} className={`${inp} w-full`}/></div>
-                                <div><label className={`${lbl} block mb-1`}>GST</label><input type="text" value={form.gst || ''} onChange={e=>setForm({...form,gst:e.target.value})} className={`${inp} w-full`}/></div>
-                                <div><label className={`${lbl} block mb-1`}>Phone</label><input type="tel" value={form.phone || ''} onChange={e=>setForm({...form,phone:e.target.value})} className={`${inp} w-full`}/></div>
-                                <div><label className={`${lbl} block mb-1`}>Email</label><input type="email" value={form.email || ''} onChange={e=>setForm({...form,email:e.target.value})} className={`${inp} w-full`}/></div>
-                                <div className="col-span-2"><label className={`${lbl} block mb-1`}>Address</label><input type="text" value={form.address || ''} onChange={e=>setForm({...form,address:e.target.value})} className={`${inp} w-full`}/></div>
-                            </div>
-                            <button onClick={handleCompanyUpdate} className="bg-[#2980b9] hover:bg-[#1a5276] text-white font-black px-6 py-1.5 text-[13px] border border-[#1a5276] flex items-center gap-2"><Save size={14}/> Update Company</button>
-                        </div>)}
-                    </div>
-                </div>)}
-
-                {/* COMPANY SELECTION */}
-                {section === 'company-selection' && (<div>
-                    <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><CheckCircle size={18}/> Company Selection</h2>
-                    <p className="text-[12px] text-slate-900 font-bold mb-3">Select the active company for this session:</p>
-                    <div className="bg-white border border-[#7a9ca8] p-4 max-w-3xl">
-                        {companies.length === 0 ? (
-                            <p className="text-center text-slate-700 font-bold py-8">No companies registered. Go to Company Creation first.</p>
-                        ) : (<div className="grid grid-cols-2 gap-3">
-                            {companies.map(c => (<button key={c.id} onClick={()=>handleSelectCompany(c.id)} className={`border-2 p-3 text-left transition ${activeCompanyId === c.id ? 'border-emerald-500 bg-emerald-50' : 'border-[#c0d0d8] hover:border-[#2980b9] hover:bg-[#eaf3f8]'}`}>
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="font-black text-slate-900 text-[13px]">{c.name}</span>
-                                    {activeCompanyId === c.id && <CheckCircle size={16} className="text-emerald-600"/>}
-                                </div>
-                                <div className="text-[10px] text-slate-900 font-bold">GST: {c.gst || '-'}</div>
-                                <div className="text-[10px] text-slate-900 font-bold">📞 {c.phone || '-'}</div>
-                                <div className="text-[10px] text-slate-900 font-bold">{c.address || '-'}</div>
-                                <div className="text-[10px] text-[#2980b9] font-black mt-1">FY: {c.financialYear}</div>
-                            </button>))}
-                        </div>)}
-                    </div>
-                </div>)}
 
                 {/* USER CREATION */}
                 {section === 'user-creation' && (<div>
@@ -399,57 +393,6 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
                     </div>
                 </div>)}
 
-                {/* DATABASE BACKUP */}
-                {section === 'database-backup' && (<div>
-                    <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><Database size={18}/> Database Backup</h2>
-                    <div className="bg-white border border-[#7a9ca8] p-5 max-w-2xl space-y-4">
-                        <div>
-                            <h3 className="text-[13px] font-black text-slate-900 mb-2">📦 Download Backup</h3>
-                            <p className="text-[11px] text-slate-900 font-bold mb-2">Downloads all your data (companies, items, purchases, payments, receipts, tokens, reports, configs) as a JSON file.</p>
-                            <button onClick={handleBackup} className="bg-emerald-600 hover:bg-emerald-500 text-white font-black px-6 py-2 text-[13px] flex items-center gap-2"><Download size={14}/> Download Backup Now</button>
-                        </div>
-                        <hr/>
-                        <div>
-                            <h3 className="text-[13px] font-black text-slate-900 mb-2">📥 Restore from Backup</h3>
-                            <p className="text-[11px] text-red-700 font-bold mb-2">⚠ Warning: Restore will OVERWRITE current data.</p>
-                            <input type="file" accept=".json" onChange={handleRestore} className="block text-[11px] font-bold"/>
-                        </div>
-                    </div>
-                </div>)}
-
-                {/* CHANGE PASSWORD */}
-                {section === 'change-password' && (<div>
-                    <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><KeyRound size={18}/> Change Password</h2>
-                    <div className="bg-white border border-[#7a9ca8] p-5 max-w-md space-y-3">
-                        <div><label className={`${lbl} block mb-1`}>Current Password *</label><input type="password" value={oldPass} onChange={e=>setOldPass(e.target.value)} className={`${inp} w-full`}/></div>
-                        <div><label className={`${lbl} block mb-1`}>New Password *</label><input type="password" value={newPass} onChange={e=>setNewPass(e.target.value)} className={`${inp} w-full`}/></div>
-                        <div><label className={`${lbl} block mb-1`}>Confirm New Password *</label><input type="password" value={confirmPass} onChange={e=>setConfirmPass(e.target.value)} className={`${inp} w-full`}/></div>
-                        <div className="pt-3 border-t border-[#c0d0d8]">
-                            <button onClick={handleChangePassword} className="bg-[#2980b9] hover:bg-[#1a5276] text-white font-black px-6 py-1.5 text-[13px] border border-[#1a5276] flex items-center gap-2"><Save size={14}/> Change Password</button>
-                        </div>
-                    </div>
-                </div>)}
-
-                {/* CONFIG SETTINGS */}
-                {section === 'config-settings' && (<div>
-                    <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><SettingsIcon size={18}/> Config Settings</h2>
-                    <div className="bg-white border border-[#7a9ca8] p-5 max-w-3xl space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div><label className={`${lbl} block mb-1`}>Default GST %</label><select value={config.defaultGstPct} onChange={e=>setConfig({...config,defaultGstPct:e.target.value})} className={`${inp} w-full`}><option>0</option><option>5</option><option>12</option><option>18</option><option>28</option></select></div>
-                            <div><label className={`${lbl} block mb-1`}>Currency</label><select value={config.currency} onChange={e=>setConfig({...config,currency:e.target.value})} className={`${inp} w-full`}><option>INR</option><option>USD</option><option>EUR</option></select></div>
-                            <div><label className={`${lbl} block mb-1`}>Date Format</label><select value={config.dateFormat} onChange={e=>setConfig({...config,dateFormat:e.target.value})} className={`${inp} w-full`}><option>DD-MM-YYYY</option><option>MM-DD-YYYY</option><option>YYYY-MM-DD</option></select></div>
-                            <div><label className={`${lbl} block mb-1`}>Decimal Places</label><select value={config.decimalPlaces} onChange={e=>setConfig({...config,decimalPlaces:e.target.value})} className={`${inp} w-full`}><option>0</option><option>2</option><option>3</option><option>4</option></select></div>
-                            <div><label className={`${lbl} block mb-1`}>Low Stock Alert</label><input type="number" value={config.lowStockAlert} onChange={e=>setConfig({...config,lowStockAlert:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div><label className={`${lbl} block mb-1`}>Expiry Alert (days before)</label><input type="number" value={config.expiryAlertDays} onChange={e=>setConfig({...config,expiryAlertDays:e.target.value})} className={`${inp} w-full`}/></div>
-                        </div>
-                        <div className="flex items-center gap-4 pt-2">
-                            <label className="flex items-center gap-2 text-[12px] font-bold text-slate-900 cursor-pointer"><input type="checkbox" checked={config.enableBarcode} onChange={e=>setConfig({...config,enableBarcode:e.target.checked})}/>Enable Barcode Scanning</label>
-                            <label className="flex items-center gap-2 text-[12px] font-bold text-slate-900 cursor-pointer"><input type="checkbox" checked={config.enableSMS} onChange={e=>setConfig({...config,enableSMS:e.target.checked})}/>Enable SMS Notifications</label>
-                        </div>
-                        <button onClick={handleSaveConfig} className="bg-[#2980b9] hover:bg-[#1a5276] text-white font-black px-6 py-1.5 text-[13px] border border-[#1a5276] flex items-center gap-2"><Save size={14}/> Save Configuration</button>
-                    </div>
-                </div>)}
-
                 {/* BARCODE DESIGN */}
                 {section === 'barcode-design' && (<div>
                     <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><ScanLine size={18}/> Barcode Design</h2>
@@ -472,23 +415,6 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
                     </div>
                 </div>)}
 
-                {/* PRINT SETTINGS */}
-                {section === 'print-settings' && (<div>
-                    <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><Printer size={18}/> Print Settings</h2>
-                    <div className="bg-white border border-[#7a9ca8] p-5 max-w-2xl space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div><label className={`${lbl} block mb-1`}>Bill Format</label><select value={printCfg.billFormat} onChange={e=>setPrintCfg({...printCfg,billFormat:e.target.value})} className={`${inp} w-full`}><option>Thermal 50mm</option><option>Thermal 80mm</option><option>A4</option><option>A5</option></select></div>
-                            <div><label className={`${lbl} block mb-1`}>Printer Name</label><input type="text" value={printCfg.printerName} onChange={e=>setPrintCfg({...printCfg,printerName:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div><label className={`${lbl} block mb-1`}>Number of Copies</label><input type="number" min="1" max="5" value={printCfg.copies} onChange={e=>setPrintCfg({...printCfg,copies:e.target.value})} className={`${inp} w-full`}/></div>
-                            <div className="col-span-2"><label className={`${lbl} block mb-1`}>Footer Message</label><input type="text" value={printCfg.footerMessage} onChange={e=>setPrintCfg({...printCfg,footerMessage:e.target.value})} className={`${inp} w-full`}/></div>
-                        </div>
-                        <div className="flex items-center gap-4 pt-2">
-                            <label className="flex items-center gap-2 text-[12px] font-bold text-slate-900 cursor-pointer"><input type="checkbox" checked={printCfg.showGSTBreakup} onChange={e=>setPrintCfg({...printCfg,showGSTBreakup:e.target.checked})}/>Show GST Breakup</label>
-                            <label className="flex items-center gap-2 text-[12px] font-bold text-slate-900 cursor-pointer"><input type="checkbox" checked={printCfg.showCompanyLogo} onChange={e=>setPrintCfg({...printCfg,showCompanyLogo:e.target.checked})}/>Show Company Logo</label>
-                        </div>
-                        <button onClick={handleSavePrintSettings} className="bg-[#2980b9] hover:bg-[#1a5276] text-white font-black px-6 py-1.5 text-[13px] border border-[#1a5276] flex items-center gap-2"><Save size={14}/> Save Print Settings</button>
-                    </div>
-                </div>)}
 
             </div>
         </div>

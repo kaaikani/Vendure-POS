@@ -234,7 +234,7 @@ export default function VendureDashboard() {
     const [session, setSession] = useState(null);
     const [checking, setChecking] = useState(true);
     const [activeTab, setActiveTab] = useState(null);
-    const [settingsSection, setSettingsSection] = useState('company-creation');
+    const [settingsSection, setSettingsSection] = useState('user-creation');
     const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
 
     // Auth guard: check session on mount
@@ -320,8 +320,7 @@ export default function VendureDashboard() {
                 {/* Minimal top bar */}
                 <div className="h-14 bg-slate-900 flex items-center justify-between px-6 shrink-0">
                     <div className="flex items-center gap-2">
-                        <span className="text-yellow-500 text-2xl font-black">#</span>
-                        <span className="text-lg font-black text-white tracking-widest">HASHTAG</span>
+                        <span className="text-lg font-black text-white tracking-widest">AVS ECOM</span>
                         <span className="text-[10px] text-slate-800 uppercase tracking-widest ml-2">POS Terminal</span>
                     </div>
                     <div className="flex items-center gap-4">
@@ -381,8 +380,7 @@ export default function VendureDashboard() {
       {/* ═══ ROW 1: Blue title bar ═══ */}
       <div className="h-7 flex items-center justify-between px-3 shrink-0" style={{background:'linear-gradient(90deg, #1a5276, #2980b9)'}}>
         <div className="flex items-center gap-2">
-          <span className="text-yellow-400 font-black text-base">#</span>
-          <span className="text-white text-xs font-black tracking-[3px]">HASHTAG PRIVATE LIMITED</span>
+          <span className="text-white text-xs font-black tracking-[3px]">AVS ECOM PRIVATE LIMITED</span>
           <span className="text-cyan-100 text-[10px] font-bold ml-2">— 2026-2027</span>
         </div>
         <div className="flex items-center gap-3 text-[10px]">
@@ -418,15 +416,8 @@ export default function VendureDashboard() {
               <div className="fixed inset-0 z-40" onClick={()=>setSettingsMenuOpen(false)}/>
               <div className="absolute left-0 top-full mt-0.5 w-60 bg-white border-2 border-[#1a5276] shadow-2xl z-50" style={{color:'#000'}}>
                 {[
-                  { id: 'company-creation', label: 'Company Creation' },
-                  { id: 'company-updation', label: 'Company Updation' },
-                  { id: 'company-selection', label: 'Company Selection' },
                   { id: 'user-creation', label: 'User Creation' },
-                  { id: 'database-backup', label: 'DataBase BackUp' },
-                  { id: 'change-password', label: 'Change Password' },
-                  { id: 'config-settings', label: 'Config Settings' },
                   { id: 'barcode-design', label: 'Barcode Design' },
-                  { id: 'print-settings', label: 'Print Settings' },
                 ].map(s => (
                   <button key={s.id} onClick={(e) => {
                     e.stopPropagation();
@@ -472,7 +463,7 @@ export default function VendureDashboard() {
               <div className="absolute inset-0 opacity-50" style={{backgroundImage:'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 1440 320\'%3E%3Cpath fill=\'%23ffffff\' d=\'M0,160L48,170.7C96,181,192,203,288,197.3C384,192,480,160,576,149.3C672,139,768,149,864,176C960,203,1056,245,1152,245.3C1248,245,1344,203,1392,181.3L1440,160L1440,320L0,320Z\'/%3E%3C/svg%3E")', backgroundSize:'cover', backgroundPosition:'bottom'}}/>
               <div className="relative z-10 text-center">
                 <div className="text-6xl font-black text-white mb-2 tracking-[6px] drop-shadow-lg" style={{textShadow:'2px 3px 6px rgba(0,0,0,0.3)'}}>
-                  <span className="text-yellow-400">#</span> HASHTAG
+                  AVS ECOM
                 </div>
                 <div className="text-white text-xl font-black tracking-[8px] uppercase mb-6" style={{textShadow:'1px 2px 4px rgba(0,0,0,0.3)'}}>
                   Medical POS System
@@ -507,7 +498,7 @@ export default function VendureDashboard() {
           <span>Ready</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/>
         </div>
-        <span className="text-[9px] text-[#2c3e50] font-bold">HASHTAG PRIVATE LIMITED (2026-2027)</span>
+        <span className="text-[9px] text-[#2c3e50] font-bold">AVS ECOM PRIVATE LIMITED (2026-2027)</span>
         <span className="text-[9px] text-[#34495e]">{new Date().toLocaleString('en-IN', {weekday:'short', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true})}</span>
       </div>
     </div>);

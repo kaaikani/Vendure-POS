@@ -3,6 +3,8 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { SITE_NAME, SITE_URL } from "@/lib/metadata";
+import SWRegister from "@/components/pwa/sw-register";
+import InstallPrompt from "@/components/pwa/install-prompt";
 const geistSans = Geist({
     variable: "--font-geist-sans",
     subsets: ["latin"],
@@ -18,6 +20,16 @@ export const metadata = {
         template: `%s | ${SITE_NAME}`,
     },
     description: "Shop the best products at Vendure Store. Quality products, competitive prices, and fast delivery.",
+    manifest: "/manifest.json",
+    appleWebApp: {
+        capable: true,
+        statusBarStyle: "black-translucent",
+        title: "AVS ECOM POS",
+    },
+    icons: {
+        icon: "/icons/icon-192.png",
+        apple: "/icons/icon-192.png",
+    },
     openGraph: {
         type: "website",
         siteName: SITE_NAME,
@@ -53,6 +65,8 @@ export default function RootLayout({ children }) {
                 <ThemeProvider>
                     {children}
                     <Toaster />
+                    <SWRegister />
+                    <InstallPrompt />
                 </ThemeProvider>
             </body>
         </html>);

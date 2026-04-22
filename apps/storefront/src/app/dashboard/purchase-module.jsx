@@ -188,7 +188,7 @@ export default function PurchaseModule() {
     return (<div className="flex flex-col h-[85vh] rounded-md overflow-hidden font-sans shadow-xl border border-slate-400" style={{ background: '#d4e6f1' }}>
         {/* Title bar */}
         <div className="h-[22px] flex items-center px-2 shrink-0 bg-gradient-to-r from-[#1a5276] to-[#2980b9] border-b border-[#154360] relative">
-            <span className="text-white text-[11px] font-bold">Purchase - HASHTAG PRIVATE LIMITED 2026-2027</span>
+            <span className="text-white text-[11px] font-bold">Purchase - AVS ECOM PRIVATE LIMITED 2026-2027</span>
             <button className="absolute right-1 top-0 text-white hover:bg-red-500 w-6 h-[20px] flex items-center justify-center"><X size={12}/></button>
         </div>
 
