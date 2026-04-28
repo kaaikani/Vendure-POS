@@ -10,17 +10,18 @@ export class LedgerService {
     }
 
     async createLedger(ctx, input) {
-        // Duplicate check: same name + contactNumber should not repeat
-        if (input.contactNumber) {
+        // Uniqueness key: type + contactNumber + invoiceNumber.
+        // Same supplier (same contact) CAN have many invoices — only exact invoice-number repeats are blocked.
+        if (input.contactNumber && input.invoiceNumber) {
             const existing = await this.connection.getRepository(ctx, Ledger).findOne({
                 where: {
-                    partyName: input.partyName,
                     contactNumber: input.contactNumber,
+                    invoiceNumber: input.invoiceNumber,
                     type: input.type,
                 }
             });
             if (existing) {
-                throw new Error(`Supplier "${input.partyName}" with contact "${input.contactNumber}" already exists (Ledger ID: ${existing.id}).`);
+                throw new Error(`Invoice "${input.invoiceNumber}" already exists for this ${String(input.type || '').toLowerCase()} (Ledger ID: ${existing.id}). Use a different invoice number.`);
             }
         }
 

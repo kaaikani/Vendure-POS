@@ -3,8 +3,37 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LookupBarcodeQuery } from '../../core/queries/PosQueries';
 import { CreateLedgerCommand } from '../../core/queries/ledger.query';
 import { ListItemsQuery, CreateSaleCommand, ListSalesQuery } from '../../core/queries/pharma.query';
+import { invalidateCache } from '../../core/queries/cache';
+import { gql } from '../../core/queries/gql';
 
 const GST_RATE = 0.18;
+
+// Common unit presets — covers weight (fruits/vegetables), count (biscuits/choc), volume (milk)
+const COMMON_UNITS = [
+    '1 Pc', '1 Pack', '1 Box', '1 Dozen',
+    '50 g', '100 g', '200 g', '250 g', '500 g', '750 g',
+    '1 kg', '1.5 kg', '2 kg', '5 kg',
+    '1/4 kg', '1/2 kg', '3/4 kg',
+    '100 ml', '250 ml', '500 ml', '1 L', '2 L', '5 L',
+];
+
+// Detect if an item is weight-based to pick a sensible default unit
+function defaultUnitFor(item) {
+    if (!item) return '1 Pc';
+    if (item.isWeightBased) return '1 kg';
+    const cat = (item.category || '').toLowerCase();
+    if (/fruit|vegetable|veg|pulse|grain|rice|atta|flour|sugar|salt/i.test(cat)) return '1 kg';
+    if (/milk|oil|water|juice|drink/i.test(cat)) return '1 L';
+    return '1 Pc';
+}
+const BILL_SIZES = {
+    '3inch': { label: '3"', width: '76mm', css: '@page{size:76mm auto;margin:2mm}' },
+    '4inch': { label: '4"', width: '104mm', css: '@page{size:104mm auto;margin:3mm}' },
+    '6inch': { label: '6"', width: '152mm', css: '@page{size:152mm auto;margin:4mm}' },
+    'A4': { label: 'A4', width: '210mm', css: '@page{size:A4;margin:10mm}' },
+    'A5': { label: 'A5', width: '148mm', css: '@page{size:A5;margin:8mm}' },
+    'A6': { label: 'A6', width: '105mm', css: '@page{size:A6;margin:5mm}' },
+};
 
 function saveToReport(order) { try { const e = JSON.parse(localStorage.getItem('pos_reports') || '[]'); e.unshift({ ...order, timestamp: new Date().toISOString() }); localStorage.setItem('pos_reports', JSON.stringify(e)); } catch {} }
 
@@ -43,6 +72,22 @@ export default function PosModule() {
     const [selectedProduct, setSelectedProduct] = useState(null); // For stock display
     const searchRef = useRef(null);
 
+    // Inline row autocomplete (item name / code)
+    const [suggestRow, setSuggestRow] = useState(-1);   // which row's input is active
+    const [suggestField, setSuggestField] = useState(''); // 'itemName' | 'code'
+    const [suggestSelIdx, setSuggestSelIdx] = useState(0);
+
+    // Per-row size variant dropdown (Unit cell shows kg list when product has variants)
+    const [unitDropdownRow, setUnitDropdownRow] = useState(-1);
+    const [unitDropdownSelIdx, setUnitDropdownSelIdx] = useState(0);
+
+    // Checkout flow — split payment (Cash + UPI + Card combined for one bill)
+    const [showCheckout, setShowCheckout] = useState(false);
+    const [payCash, setPayCash] = useState('');
+    const [payUpi, setPayUpi] = useState('');
+    const [payCard, setPayCard] = useState('');
+    const [payCredit, setPayCredit] = useState('');
+
     const [lastOrder, setLastOrder] = useState(null);
     const [showToast, setShowToast] = useState(false);
 
@@ -54,23 +99,31 @@ export default function PosModule() {
     // Keyboard navigation
     const [focusedRow, setFocusedRow] = useState(-1); // cart row index under arrow focus
 
+    // New: sales tabs, bill-size, counter & rate-type label, customer autocomplete
+    const [activeSalesTab, setActiveSalesTab] = useState('Sales1');
+    const [counterName, setCounterName] = useState('COUNTER A');
+    const [billSize, setBillSize] = useState('3inch');
+    const [customerSuggestions, setCustomerSuggestions] = useState([]);
+    const [showCustSuggest, setShowCustSuggest] = useState(false);
+    const [custSuggestSelIdx, setCustSuggestSelIdx] = useState(0);
+    const [nameSuggestions, setNameSuggestions] = useState([]);
+    const [showNameSuggest, setShowNameSuggest] = useState(false);
+    const [nameSuggestSelIdx, setNameSuggestSelIdx] = useState(0);
+    const [pickedCustomerId, setPickedCustomerId] = useState(null);
+    const itemNameInputsRef = useRef({});
+
     useEffect(() => {
         setBillNo(String(Math.floor(Math.random() * 900 + 100)));
         setDate(new Date().toLocaleDateString('en-GB'));
         const reports = JSON.parse(localStorage.getItem('pos_reports') || '[]');
         setLastBillNo(String(reports.length || 3));
-        // Load items via API (cached — only one hit)
+        // Force fresh fetch on POS open so newly-added items / size variants are picked up
+        invalidateCache('pharma:items');
         new ListItemsQuery().execute().then(setPharmaItems).catch(e => console.error(e));
         // Load parked bills
         try { setParkedBills(JSON.parse(localStorage.getItem('pos_parked_bills') || '[]')); } catch {}
-        // ⚡ AUTO-OPEN search popup on load — keyboard-first workflow
-        setTimeout(() => {
-            setSearchRowIdx(0);
-            setSearchText('');
-            setSearchSelIdx(0);
-            setShowSearch(true);
-            searchRef.current?.focus();
-        }, 300);
+        // Auto-focus the first ItemName input on load
+        setTimeout(() => { itemNameInputsRef.current[0]?.focus(); }, 200);
     }, []);
 
     // Persist parked bills
@@ -107,35 +160,83 @@ export default function PosModule() {
         setTimeout(() => searchRef.current?.focus(), 50);
     };
 
+    // Returns valid weight/size variants from the item (excludes "NA" placeholders)
+    const getItemVariants = (item) => {
+        const sizes = Array.isArray(item?.sizes) ? item.sizes : [];
+        return sizes.filter(s => s && s.size && s.size !== 'NA' && (parseFloat(s.rate) || 0) > 0);
+    };
+
+    // Lookup variants for a cart row by matching code/itemName against pharmaItems master
+    const getRowVariants = (row) => {
+        if (!row?.itemName) return [];
+        const prod = pharmaItems.find(p => p.code === row.code || p.itemName === row.itemName);
+        return prod ? getItemVariants(prod) : [];
+    };
+
+    // Apply a variant pick to a cart row — updates unit, rate, amount instantly
+    const applyVariantToRow = (rowIdx, variant) => {
+        if (!variant) return;
+        setRows(prev => prev.map((r, i) => {
+            if (i !== rowIdx) return r;
+            const rate = parseFloat(variant.rate) || 0;
+            const qty = parseFloat(r.qty) || 1;
+            const amt = qty * rate;
+            return { ...r, unit: variant.size, rate: String(rate), amount: amt.toFixed(2), total: amt.toFixed(2) };
+        }));
+        setUnitDropdownRow(-1);
+    };
+
     const pickItem = (item) => {
         if (!item) return;
         setSelectedProduct(item);
+        // Default to first size variant if available, else item's base rate
+        const variants = getItemVariants(item);
+        const defaultVariant = variants.length > 0 ? variants[0] : null;
+        finalizePickItem(item, defaultVariant);
+    };
+
+    // Final cart-row insertion (with optional size variant override)
+    const finalizePickItem = (item, variant) => {
+        if (!item) return;
         let idx = searchRowIdx;
-        let isLastRow = false;
+        let nextFocusIdx = 0;
+        const overrideUnit = variant?.size;
+        const overrideRate = variant ? parseFloat(variant.rate) : null;
         setRows(prev => {
             let nr = [...prev];
-            while (nr.length <= idx) nr.push({ sno: nr.length + 1, code: '', itemName: '', qty: '', rate: '', amount: '', total: '' });
-            const r = {
-                ...nr[idx], code: item.code, itemName: item.itemName,
-                qty: '1', rate: item.salesRate || item.mrpRate || '0',
-                amount: '0', total: '0',
-            };
-            const q = 1; const rate = parseFloat(r.rate) || 0;
-            r.amount = (q * rate).toFixed(2); r.total = r.amount;
-            nr[idx] = r;
-            isLastRow = idx === nr.length - 1;
-            // Always add a next blank row so we can continue adding items
-            if (isLastRow) nr.push({ sno: nr.length + 1, code: '', itemName: '', qty: '', rate: '', amount: '', total: '' });
-            return nr;
+            // DUPLICATE DETECTION: same product + same variant (unit) → bump qty
+            const dupUnit = overrideUnit || item.unit || defaultUnitFor(item);
+            const existingIdx = nr.findIndex(r => r.itemName && r.code === item.code && r.itemName === item.itemName && (r.unit || '') === dupUnit);
+            if (existingIdx >= 0 && existingIdx !== idx) {
+                // Bump existing row's qty
+                const er = { ...nr[existingIdx] };
+                const newQty = (parseFloat(er.qty) || 0) + 1;
+                const rate = parseFloat(er.rate) || 0;
+                er.qty = String(newQty);
+                er.amount = (newQty * rate).toFixed(2);
+                er.total = er.amount;
+                nr[existingIdx] = er;
+            } else {
+                // New product → fill the row at idx (or append if idx out of range)
+                while (nr.length <= idx) nr.push({ sno: nr.length + 1, code: '', itemName: '', qty: '', rate: '', amount: '', total: '' });
+                const rate = overrideRate != null ? overrideRate : (parseFloat(item.salesRate || item.mrpRate || 0) || 0);
+                nr[idx] = {
+                    ...nr[idx], code: item.code, itemName: item.itemName,
+                    unit: dupUnit,
+                    qty: '1', rate: String(rate),
+                    amount: rate.toFixed(2), total: rate.toFixed(2),
+                };
+            }
+            // Clean up: keep only rows that have itemName (filled rows)
+            nr = nr.filter(r => r.itemName);
+            // Ensure exactly ONE trailing blank row for continuous entry
+            nr.push({ sno: nr.length + 1, code: '', itemName: '', qty: '', rate: '', amount: '', total: '' });
+            // Focus the trailing empty row
+            nextFocusIdx = nr.length - 1;
+            return nr.map((r, i) => ({ ...r, sno: i + 1 }));
         });
-        // ⚡ AUTO-REOPEN search popup for next item — full keyboard flow
-        setTimeout(() => {
-            setSearchRowIdx(idx + 1);
-            setSearchText('');
-            setSearchSelIdx(0);
-            setShowSearch(true);
-            searchRef.current?.focus();
-        }, 80);
+        // Move focus to trailing empty row's ItemName for continuous entry
+        setTimeout(() => { itemNameInputsRef.current[nextFocusIdx]?.focus(); }, 50);
     };
 
     // When clicking a row in the cart, show that product's stock
@@ -150,49 +251,143 @@ export default function PosModule() {
         return (it.itemName || '').toLowerCase().includes(s) || String(it.code).includes(s);
     });
 
+    // Inline suggestions for a typed value (matches itemName OR code)
+    // Sorted: exact match → starts-with → contains, code priority when typing in code field
+    const getRowSuggestions = (text) => {
+        const s = String(text || '').trim().toLowerCase();
+        if (!s) return [];
+        const codeFirst = suggestField === 'code';
+        const matches = pharmaItems.filter(it =>
+            (it.itemName || '').toLowerCase().includes(s) || String(it.code || '').toLowerCase().includes(s)
+        );
+        const score = (it) => {
+            const code = String(it.code || '').toLowerCase();
+            const name = (it.itemName || '').toLowerCase();
+            // Lower score = higher priority. Code priority when typing in code field.
+            if (codeFirst) {
+                if (code === s) return 0;          // exact code match
+                if (code.startsWith(s)) return 1;  // code starts-with
+                if (name === s) return 2;          // exact name match
+                if (name.startsWith(s)) return 3;  // name starts-with
+                if (code.includes(s)) return 4;    // code contains
+                return 5;                          // name contains
+            } else {
+                if (name === s) return 0;          // exact name match
+                if (name.startsWith(s)) return 1;  // name starts-with
+                if (code === s) return 2;          // exact code match
+                if (code.startsWith(s)) return 3;  // code starts-with
+                if (name.includes(s)) return 4;    // name contains
+                return 5;                          // code contains
+            }
+        };
+        matches.sort((a, b) => score(a) - score(b));
+        return matches.slice(0, 50);
+    };
+    const activeSuggestions = suggestRow >= 0
+        ? getRowSuggestions(rows[suggestRow]?.[suggestField] || '')
+        : [];
+
+    // Open checkout panel — validates cart has items
+    const openCheckout = () => {
+        const validRows = rows.filter(r => r.itemName && parseFloat(r.qty) > 0);
+        if (validRows.length === 0) return alert('Add at least one item before checkout.');
+        // Start fresh — let cashier type amounts. Balance Amount will show what's due.
+        setPayCash(''); setPayUpi(''); setPayCard(''); setPayCredit('');
+        setShowCheckout(true);
+    };
+
+    // Live totals for the checkout panel
+    const splitTotal = (parseFloat(payCash) || 0) + (parseFloat(payUpi) || 0) + (parseFloat(payCard) || 0) + (parseFloat(payCredit) || 0);
+    const splitBalance = grandTotal - splitTotal;
+
+    // Confirm payment — applies split amounts and saves
+    const confirmCheckout = async () => {
+        if (splitTotal <= 0) return alert('Enter at least one payment amount.');
+        if (Math.abs(splitBalance) > 0.01 && (parseFloat(payCredit) || 0) === 0) {
+            if (splitBalance > 0) {
+                if (!confirm(`Balance ₹${splitBalance.toFixed(2)} unpaid. Save remaining as Credit (customer ledger)?`)) return;
+                setPayCredit(String(splitBalance.toFixed(2)));
+            } else {
+                if (!confirm(`Received ₹${(-splitBalance).toFixed(2)} extra. Confirm save (extra returned as change)?`)) return;
+            }
+        }
+        setShowCheckout(false);
+        setTimeout(() => handleSave(), 50);
+    };
+
     const handleSave = async () => {
         const validRows = rows.filter(r => r.itemName && parseFloat(r.qty) > 0);
         if (validRows.length === 0) return alert('Add at least one item.');
-        const balanceDue = mode === 'CREDIT' ? grandTotal : Math.max(0, grandTotal - receivedA);
-        const changeReturned = mode !== 'CREDIT' && receivedA > grandTotal ? receivedA - grandTotal : 0;
+
+        // Credit mode → customer name, phone & address are mandatory (we need to track who owes us)
+        // Split-payment amounts (from Checkout panel). Falls back to single-mode legacy values.
+        const cashA = parseFloat(payCash) || 0;
+        const upiA = parseFloat(payUpi) || 0;
+        const cardA = parseFloat(payCard) || 0;
+        const creditA = parseFloat(payCredit) || 0;
+        const totalReceived = cashA + upiA + cardA;
+        const isCredit = creditA > 0 || (totalReceived === 0 && String(mode).toUpperCase() === 'CREDIT');
+
+        if (isCredit) {
+            const missing = [];
+            if (!customerName.trim() || customerName.trim().toUpperCase() === 'COUNTER SALES') missing.push('Customer Name');
+            if (!customerPhone.trim() || customerPhone.replace(/\D/g,'').length < 10) missing.push('Mobile Number (10 digits)');
+            if (!customerAddress.trim()) missing.push('Address');
+            if (missing.length > 0) {
+                alert(`CREDIT bill requires customer details:\n\n• ${missing.join('\n• ')}\n\nFill these and try again.`);
+                if (missing[0] === 'Customer Name') document.getElementById('cust-input')?.focus();
+                else if (missing[0].startsWith('Mobile')) document.getElementById('phone-input')?.focus();
+                return;
+            }
+        }
+
+        const balanceDue = creditA > 0 ? creditA : (isCredit ? grandTotal : Math.max(0, grandTotal - totalReceived));
+        const changeReturned = !isCredit && totalReceived > grandTotal ? totalReceived - grandTotal : 0;
+        // Determine primary saleType for legacy reporting (highest contributor wins)
+        const primaryMode = creditA > 0 ? 'CREDIT'
+            : cashA >= upiA && cashA >= cardA ? 'CASH'
+            : upiA >= cardA ? 'UPI' : 'CARD';
         const now = new Date();
         const saleInput = {
             billNo: String(billNo), billDate: new Date().toISOString().split('T')[0],
             billTime: now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
-            saleType: mode, bookNo: book, billRef,
+            saleType: primaryMode, bookNo: book, billRef,
             customerName: customerName || 'Walk-in', customerPhone, customerAddress, salesMan,
             items: validRows.map(r => ({ code: r.code, name: r.itemName, qty: parseFloat(r.qty), rate: parseFloat(r.rate), amount: parseFloat(r.amount) })),
             subtotal: subTotal, taxAmount, discount: discAmt, transportCharges: transportAmt, grandTotal,
-            cashAmount: mode === 'CASH' ? receivedA : 0, upiAmount: mode === 'UPI' ? receivedA : 0, cardAmount: mode === 'CARD' ? receivedA : 0,
-            receivedAmount: receivedA, balanceDue, changeReturned,
+            cashAmount: cashA, upiAmount: upiA, cardAmount: cardA,
+            receivedAmount: totalReceived, balanceDue, changeReturned,
             remarks,
         };
         try {
+            // Auto-save customer to Vendure for future lookup (find-or-create by phone)
+            await ensureCustomer();
+
             // ⭐ SAVE TO DATABASE via GraphQL mutation
             const savedSale = await new CreateSaleCommand().execute(saleInput);
 
             // Also save to local pos_reports (for legacy report module)
             const legacyPayload = {
-                invoiceId: 'BILL-' + billNo, billNo, date, mode, book, billRef,
+                invoiceId: 'BILL-' + billNo, billNo, date, mode: primaryMode, book, billRef,
                 customer: { name: customerName || 'Walk-in', phone: customerPhone, address: customerAddress },
                 salesMan, items: validRows.map(r => ({ id: r.code, name: r.itemName, barcode: r.code, price: parseFloat(r.rate), qty: parseFloat(r.qty), total: parseFloat(r.amount), quantityStr: '1 Pc' })),
-                saleType: mode === 'CASH' ? 'OFFLINE' : mode === 'CREDIT' ? 'CREDIT' : 'ONLINE',
+                saleType: primaryMode === 'CASH' ? 'OFFLINE' : primaryMode === 'CREDIT' ? 'CREDIT' : 'ONLINE',
                 subtotal: subTotal, taxAmount, discount: discAmt, transport: transportAmt,
-                grandTotal, receivedAmount: receivedA, balance: balanceDue,
+                grandTotal, receivedAmount: totalReceived, balance: balanceDue,
                 gstAmount: taxAmount, cashAmount: saleInput.cashAmount, upiAmount: saleInput.upiAmount, cardAmount: saleInput.cardAmount,
                 dbId: savedSale?.id,
             };
             saveToReport(legacyPayload);
 
             // For CREDIT sales → create customer ledger entry
-            if (mode === 'CREDIT' && customerName) {
+            if (creditA > 0 && customerName) {
                 try {
                     await new CreateLedgerCommand().execute({
                         type: 'CUSTOMER',
                         partyName: customerName,
                         invoiceNumber: String(billNo),
                         invoiceDate: new Date().toISOString(),
-                        amount: Math.round(grandTotal),
+                        amount: Math.round(creditA),
                         creditDays: 30,
                         contactNumber: customerPhone || '',
                         address: customerAddress || '',
@@ -216,16 +411,19 @@ export default function PosModule() {
         setReceivedAmt(''); setDiscount('0'); setTransportCharges('0');
         setCustomerName(''); setCustomerPhone(''); setCustomerAddress(''); setBillRef(''); setRemarks('');
         setSelectedProduct(null);
-        // Auto-reopen search for next bill
-        setTimeout(() => {
-            setSearchRowIdx(0); setSearchText(''); setSearchSelIdx(0); setShowSearch(true);
-            searchRef.current?.focus();
-        }, 100);
+        setPickedCustomerId(null);
+        setShowCustSuggest(false); setShowNameSuggest(false);
+        setPayCash(''); setPayUpi(''); setPayCard(''); setPayCredit('');
+        setShowCheckout(false);
+        // Focus first ItemName input for next bill entry
+        setTimeout(() => { itemNameInputsRef.current[0]?.focus(); }, 100);
     };
 
     const handlePrint = () => {
         if (!lastOrder) return alert('No bill to print. Save a bill first (F1).');
-        const w = window.open('', '_blank', 'width=420,height=700');
+        const size = BILL_SIZES[billSize] || BILL_SIZES['3inch'];
+        const winWidth = parseInt(size.width) * 4 || 420;
+        const w = window.open('', '_blank', `width=${winWidth},height=800`);
         if (!w) return alert('Allow popups to print invoice.');
         const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
         const totalQty = lastOrder.items.reduce((s, i) => s + (parseFloat(i.qty) || 0), 0);
@@ -239,9 +437,10 @@ export default function PosModule() {
 
         const html = `<!DOCTYPE html><html><head><title>Invoice ${lastOrder.billNo}</title>
 <style>
+${size.css}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI','Arial',sans-serif;padding:20px;color:#1e293b;max-width:400px;margin:0 auto;background:#fff}
-@media print{body{padding:8px;max-width:100%}}
+body{font-family:'Segoe UI','Arial',sans-serif;padding:10px;color:#1e293b;width:${size.width};max-width:${size.width};margin:0 auto;background:#fff;font-size:${size.width.includes('76') ? '10px' : size.width.includes('104') ? '11px' : '12px'}}
+@media print{body{padding:4px;width:100%;max-width:100%}}
 .center{text-align:center}
 .right{text-align:right}
 hr{border:none;border-top:2px dashed #94a3b8;margin:10px 0}
@@ -381,22 +580,42 @@ table{width:100%;border-collapse:collapse}
             // F-key shortcuts (work even when inputs are focused)
             if (e.key === 'F1') { e.preventDefault(); handleSave(); return; }
             if (e.key === 'F2') { e.preventDefault(); handlePrint(); return; }
-            // Quick search: + or Insert opens search popup (pharmacy cashier style)
-            if ((e.key === '+' || e.key === 'Insert') && !showSearch && !showParkedModal) {
-                e.preventDefault();
-                const lastIdx = rows.findIndex(r => !r.itemName);
-                setSearchRowIdx(lastIdx >= 0 ? lastIdx : rows.length);
-                setSearchText(''); setSearchSelIdx(0); setShowSearch(true);
-                setTimeout(() => searchRef.current?.focus(), 30);
-                return;
-            }
             if (e.key === 'F3') { e.preventDefault(); document.getElementById('disc-input')?.focus(); return; }
             if (e.key === 'F4') { e.preventDefault(); document.getElementById('disc-input')?.focus(); return; }
             if (e.key === 'F6') { e.preventDefault(); setCustomerEnabled(true); setTimeout(()=>document.getElementById('cust-input')?.focus(),30); return; }
             if (e.key === 'F7') { e.preventDefault(); handleHold(); return; }
             if (e.key === 'F8') { e.preventDefault(); setShowParkedModal(true); setParkedSelIdx(0); return; }
-            if (e.key === 'F9') { e.preventDefault(); document.getElementById('recv-input')?.focus(); return; }
+            if (e.key === 'F9') { e.preventDefault(); if (!showCheckout) openCheckout(); return; }
+            if (e.key === 'F10') { e.preventDefault(); openCheckout(); return; }
             if (e.key === 'F11') { e.preventDefault(); document.getElementById('phone-input')?.focus(); return; }
+
+            // Alt-key shortcuts for fast Customer / Mobile field jumps
+            if (e.altKey && (e.key === 'c' || e.key === 'C')) {
+                e.preventDefault();
+                document.getElementById('cust-input')?.focus();
+                document.getElementById('cust-input')?.select?.();
+                return;
+            }
+            if (e.altKey && (e.key === 'm' || e.key === 'M')) {
+                e.preventDefault();
+                document.getElementById('phone-input')?.focus();
+                document.getElementById('phone-input')?.select?.();
+                return;
+            }
+            if (e.altKey && (e.key === 'i' || e.key === 'I')) {
+                e.preventDefault();
+                itemNameInputsRef.current[0]?.focus();
+                return;
+            }
+
+            // ── Checkout modal: Esc to close, Enter to confirm ──
+            if (showCheckout) {
+                if (e.key === 'Escape') { e.preventDefault(); setShowCheckout(false); return; }
+                if (e.key === 'Enter' && (e.target.tagName !== 'INPUT' || e.target.type === 'number')) {
+                    e.preventDefault(); confirmCheckout(); return;
+                }
+                return;
+            }
 
             // ── Parked Bills modal navigation: Arrows + Enter ──
             if (showParkedModal) {
@@ -417,19 +636,131 @@ table{width:100%;border-collapse:collapse}
                 return;
             }
 
+            // ── Unit dropdown navigation (size variants — kg list inside Unit cell) ──
+            if (unitDropdownRow >= 0) {
+                const row = rows[unitDropdownRow];
+                const variants = row ? getRowVariants(row) : [];
+                if (variants.length > 0) {
+                    if (e.key === 'Escape') { e.preventDefault(); setUnitDropdownRow(-1); return; }
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setUnitDropdownSelIdx(p => Math.min(p+1, variants.length-1)); return; }
+                    if (e.key === 'ArrowUp') { e.preventDefault(); setUnitDropdownSelIdx(p => Math.max(p-1, 0)); return; }
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyVariantToRow(unitDropdownRow, variants[unitDropdownSelIdx]);
+                        return;
+                    }
+                    const n = parseInt(e.key, 10);
+                    if (!isNaN(n) && n >= 1 && n <= variants.length) {
+                        e.preventDefault();
+                        applyVariantToRow(unitDropdownRow, variants[n - 1]);
+                        return;
+                    }
+                }
+            }
+
+            // ── Inline row suggestions navigation (item name / code dropdown) ──
+            if (suggestRow >= 0 && activeSuggestions.length > 0) {
+                if (e.key === 'Escape') { e.preventDefault(); setSuggestRow(-1); return; }
+                if (e.key === 'ArrowDown') { e.preventDefault(); setSuggestSelIdx(p => Math.min(p+1, activeSuggestions.length-1)); return; }
+                if (e.key === 'ArrowUp') { e.preventDefault(); setSuggestSelIdx(p => Math.max(p-1, 0)); return; }
+                if (e.key === 'Enter') { e.preventDefault(); pickItem(activeSuggestions[suggestSelIdx]); setSuggestRow(-1); return; }
+            }
+
+            // ── Customer phone dropdown navigation (Cell No field) ──
+            if (showCustSuggest && customerSuggestions.length > 0 && document.activeElement?.id === 'phone-input') {
+                if (e.key === 'Escape') { e.preventDefault(); setShowCustSuggest(false); return; }
+                if (e.key === 'ArrowDown') { e.preventDefault(); setCustSuggestSelIdx(p => Math.min(p+1, customerSuggestions.length-1)); return; }
+                if (e.key === 'ArrowUp') { e.preventDefault(); setCustSuggestSelIdx(p => Math.max(p-1, 0)); return; }
+                if (e.key === 'Enter') { e.preventDefault(); pickCustomer(customerSuggestions[custSuggestSelIdx]); return; }
+            }
+
+            // ── Customer name dropdown navigation ──
+            if (showNameSuggest && nameSuggestions.length > 0 && document.activeElement?.id === 'cust-input') {
+                if (e.key === 'Escape') { e.preventDefault(); setShowNameSuggest(false); return; }
+                if (e.key === 'ArrowDown') { e.preventDefault(); setNameSuggestSelIdx(p => Math.min(p+1, nameSuggestions.length-1)); return; }
+                if (e.key === 'ArrowUp') { e.preventDefault(); setNameSuggestSelIdx(p => Math.max(p-1, 0)); return; }
+                if (e.key === 'Enter') { e.preventDefault(); pickCustomer(nameSuggestions[nameSuggestSelIdx]); return; }
+            }
+
             // ── Cart row navigation: Arrows for row, Enter to advance to next ──
             const tag = (e.target.tagName || '').toUpperCase();
             const inInput = tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
+
+            // Cell-to-cell navigation inside cart rows using Enter / ↑ / ↓
+            const el = e.target;
+            const rowAttr = el?.dataset?.row;
+            const cellAttr = el?.dataset?.cell;
+            if (rowAttr !== undefined && cellAttr !== undefined) {
+                const curRow = parseInt(rowAttr, 10);
+                const cellOrder = ['code', 'itemName', 'qty', 'rate'];
+                const cellIdx = cellOrder.indexOf(cellAttr);
+                const focusCell = (rIdx, cell) => {
+                    const target = document.querySelector(`input[data-row="${rIdx}"][data-cell="${cell}"]`);
+                    target?.focus(); target?.select?.();
+                };
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (cellIdx < cellOrder.length - 1) {
+                        // Move to next cell in same row
+                        focusCell(curRow, cellOrder[cellIdx + 1]);
+                    } else {
+                        // Last cell → jump to next row's first editable cell (itemName)
+                        focusCell(curRow + 1, 'itemName');
+                    }
+                    return;
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    focusCell(curRow + 1, cellAttr);
+                    return;
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    focusCell(Math.max(0, curRow - 1), cellAttr);
+                    return;
+                }
+                // Smart ArrowLeft / ArrowRight — only jump to adjacent cell when cursor is at edge
+                if (e.key === 'ArrowLeft') {
+                    const isNumeric = el.type === 'number';
+                    const atStart = isNumeric || (el.selectionStart === 0 && el.selectionEnd === 0);
+                    if (atStart && cellIdx > 0) {
+                        e.preventDefault();
+                        focusCell(curRow, cellOrder[cellIdx - 1]);
+                        return;
+                    }
+                }
+                if (e.key === 'ArrowRight') {
+                    const isNumeric = el.type === 'number';
+                    const valLen = (el.value || '').length;
+                    const atEnd = isNumeric || (el.selectionStart === valLen && el.selectionEnd === valLen);
+                    if (atEnd && cellIdx < cellOrder.length - 1) {
+                        e.preventDefault();
+                        focusCell(curRow, cellOrder[cellIdx + 1]);
+                        return;
+                    }
+                }
+            }
+
             // Arrow keys only navigate cart when NOT inside an input (except when at end of input or using Ctrl)
             if (!inInput || e.ctrlKey) {
                 if (e.key === 'ArrowDown') { e.preventDefault(); setFocusedRow(p => Math.min(p+1, rows.length-1)); return; }
                 if (e.key === 'ArrowUp') { e.preventDefault(); setFocusedRow(p => Math.max(p-1, 0)); return; }
                 if (e.key === 'Delete' && focusedRow >= 0) { e.preventDefault(); removeRow(focusedRow); return; }
+                // Block default browser scroll for these keys when focus is outside an input
+                if (['ArrowLeft','ArrowRight',' ','Spacebar','PageUp','PageDown','Home','End'].includes(e.key)) {
+                    e.preventDefault();
+                    return;
+                }
+                // Enter outside input — prevent any accidental form submit/scroll
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    return;
+                }
             }
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [showSearch, searchSelIdx, filteredSearchItems, rows, showParkedModal, parkedSelIdx, parkedBills, focusedRow]);
+    }, [showSearch, searchSelIdx, filteredSearchItems, rows, showParkedModal, parkedSelIdx, parkedBills, focusedRow, suggestRow, suggestField, suggestSelIdx, activeSuggestions, showCustSuggest, customerSuggestions, custSuggestSelIdx, showNameSuggest, nameSuggestions, nameSuggestSelIdx, unitDropdownRow, unitDropdownSelIdx, pharmaItems, showCheckout, payCash, payUpi, payCard, payCredit, mode, grandTotal]);
 
     const removeRow = (idx) => {
         setRows(prev => {
@@ -438,242 +769,515 @@ table{width:100%;border-collapse:collapse}
         });
     };
 
+    // Auto-scroll: keep the highlighted suggestion centered in the dropdown.
+    // Down arrow → list moves UP, the next product slides into the highlight position
+    // Up arrow → list moves DOWN, the previous product slides into the highlight position
+    useEffect(() => {
+        if (suggestRow < 0 || activeSuggestions.length === 0) return;
+        const el = document.querySelector(`[data-suggest-idx="${suggestSelIdx}"]`);
+        if (!el) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, [suggestSelIdx, suggestRow]);
+
+    // Customer lookup by phone (3+ digits) — fetch from Vendure customers
+    useEffect(() => {
+        const phone = customerPhone.trim();
+        if (phone.length < 3) { setCustomerSuggestions([]); setShowCustSuggest(false); return; }
+        let cancelled = false;
+        const t = setTimeout(async () => {
+            try {
+                const query = `query FindCustomers($term: String!) {
+                    customers(options: { filter: { phoneNumber: { contains: $term } }, take: 8 }) {
+                        items { id firstName lastName phoneNumber emailAddress addresses { streetLine1 city postalCode } }
+                    }
+                }`;
+                const data = await gql(query, { useAdmin: true, variables: { term: phone } });
+                if (cancelled) return;
+                const items = data?.customers?.items || [];
+                setCustomerSuggestions(items);
+                setCustSuggestSelIdx(0);
+                setShowCustSuggest(items.length > 0);
+            } catch (err) { console.warn('Customer lookup failed:', err.message); }
+        }, 250);
+        return () => { cancelled = true; clearTimeout(t); };
+    }, [customerPhone]);
+
+    // Customer lookup by name (2+ chars) — match against firstName OR lastName
+    useEffect(() => {
+        const name = customerName.trim();
+        if (name.length < 2 || name.toUpperCase() === 'COUNTER SALES') {
+            setNameSuggestions([]); setShowNameSuggest(false); return;
+        }
+        let cancelled = false;
+        const t = setTimeout(async () => {
+            try {
+                const query = `query FindCustByName($term: String!) {
+                    customers(options: {
+                        filter: { firstName: { contains: $term }, lastName: { contains: $term } },
+                        filterOperator: OR,
+                        take: 8
+                    }) {
+                        items { id firstName lastName phoneNumber emailAddress addresses { streetLine1 city postalCode } }
+                    }
+                }`;
+                const data = await gql(query, { useAdmin: true, variables: { term: name } });
+                if (cancelled) return;
+                const items = data?.customers?.items || [];
+                setNameSuggestions(items);
+                setNameSuggestSelIdx(0);
+                setShowNameSuggest(items.length > 0);
+            } catch (err) { console.warn('Customer name lookup failed:', err.message); }
+        }, 250);
+        return () => { cancelled = true; clearTimeout(t); };
+    }, [customerName]);
+
+    const pickCustomer = (c) => {
+        setCustomerName(`${c.firstName || ''} ${c.lastName || ''}`.trim());
+        setCustomerPhone(c.phoneNumber || '');
+        const addr = c.addresses?.[0];
+        if (addr) setCustomerAddress([addr.streetLine1, addr.city, addr.postalCode].filter(Boolean).join(', '));
+        setPickedCustomerId(c.id || null);
+        setShowCustSuggest(false);
+        setShowNameSuggest(false);
+    };
+
+    // Find or create a Vendure customer for this bill (so next time mobile/name search works)
+    const ensureCustomer = async () => {
+        const name = customerName.trim();
+        const phone = customerPhone.trim();
+        if (!name || !phone || name.toUpperCase() === 'WALK-IN' || name.toUpperCase() === 'COUNTER SALES') return;
+        if (pickedCustomerId) return; // already linked to existing customer
+        try {
+            // 1) Phone exact-match lookup — avoid duplicates
+            const findQ = `query FindByPhone($p: String!) {
+                customers(options: { filter: { phoneNumber: { eq: $p } }, take: 1 }) {
+                    items { id }
+                }
+            }`;
+            const found = await gql(findQ, { useAdmin: true, variables: { p: phone } });
+            if (found?.customers?.items?.length) { setPickedCustomerId(found.customers.items[0].id); return; }
+
+            // 2) Create new customer
+            const [firstName, ...rest] = name.split(/\s+/);
+            const lastName = rest.join(' ') || '-';
+            const email = `pos+${phone.replace(/\D/g,'')}@avs.local`;
+            const createQ = `mutation CreateCust($input: CreateCustomerInput!) {
+                createCustomer(input: $input) {
+                    ... on Customer { id }
+                    ... on ErrorResult { errorCode message }
+                }
+            }`;
+            const created = await gql(createQ, { useAdmin: true, variables: { input: {
+                firstName: firstName || name,
+                lastName,
+                phoneNumber: phone,
+                emailAddress: email,
+            } } });
+            if (created?.createCustomer?.id) setPickedCustomerId(created.createCustomer.id);
+        } catch (err) { console.warn('ensureCustomer failed:', err.message); }
+    };
+
     const inp = "bg-white border border-[#888] h-[22px] px-1 text-[11px] font-bold text-slate-900 outline-none focus:bg-yellow-50 focus:border-[#1a5276]";
     const lbl = "text-[11px] font-bold text-slate-900";
 
-    return (<div className="flex flex-col h-[85vh] overflow-hidden font-sans text-[11px] select-none" style={{background:'#e8e8e8'}}>
+    return (<div className="relative w-full h-full flex flex-col overflow-hidden font-sans text-[11px] select-none" style={{background:'#f4f4f4'}}>
+        {/* Hide number input spinners */}
+        <style>{`
+            .no-spin::-webkit-outer-spin-button,
+            .no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+            .no-spin { -moz-appearance: textfield; }
+        `}</style>
 
-        {/* Title bar */}
-        <div className="h-[22px] bg-[#4dbcc4] flex items-center justify-center shrink-0 border-b border-[#3aa8b0]">
-            <h1 className="text-white font-black tracking-[4px] text-[14px]">SALES</h1>
+        {/* Shared unit suggestions for cart Unit cell */}
+        <datalist id="unit-options">
+            {COMMON_UNITS.map(u => <option key={u} value={u}/>)}
+        </datalist>
+
+        {/* ── Title bar ── */}
+        <div className="h-[22px] bg-[#7cb8c0] flex items-center px-2 justify-between shrink-0 border-b border-[#5a9da5]">
+            <h1 className="text-slate-900 font-bold text-[12px]">Retail Sales - பேர் டிபார்ட்மென்டல் ஸ்டோர் 2026-2027 - admin</h1>
+            <div className="flex items-center gap-1">
+                <button className="w-5 h-4 bg-[#c0c0c0] border border-slate-600 text-[10px] leading-none">_</button>
+                <button className="w-5 h-4 bg-[#c0c0c0] border border-slate-600 text-[10px] leading-none">□</button>
+                <button className="w-5 h-4 bg-[#c0c0c0] border border-slate-600 text-[10px] leading-none">✕</button>
+            </div>
         </div>
 
-        {/* Header form */}
-        <div className="shrink-0 border-b border-[#888]" style={{background:'#e8e8e8'}}>
-            <div className="flex items-center px-1 py-0.5 gap-1 border-b border-[#c0c0c0]">
-                <label className="text-red-700 font-bold text-[11px] w-14">Bill No</label>
-                <input type="text" value={billNo} onChange={e=>setBillNo(e.target.value)} className={`${inp} w-20`}/>
-                <label className={`${lbl} ml-2`}>Date</label>
-                <input type="text" value={date} onChange={e=>setDate(e.target.value)} className={`${inp} w-24`}/>
-                <label className={`${lbl} ml-2`}>Mode</label>
-                <select value={mode} onChange={e=>setMode(e.target.value)} className={`${inp} w-20`}><option>CASH</option><option>CREDIT</option><option>CARD</option><option>UPI</option></select>
-                <label className={`${lbl} ml-2`}>Book</label>
-                <input type="text" value={book} onChange={e=>setBook(e.target.value)} className={`${inp} w-14`}/>
-                <label className={`${lbl} ml-2`}>Bill Ref</label>
-                <input type="text" value={billRef} onChange={e=>setBillRef(e.target.value)} className={`${inp} w-10`}/>
-                <div className="bg-[#4dbcc4] h-[22px] w-12 border border-[#888]"/>
-                <label className="flex items-center gap-1 ml-1 cursor-pointer"><input type="checkbox" checked={customerEnabled} onChange={e=>setCustomerEnabled(e.target.checked)}/><span className={lbl}>Customer</span></label>
-                <input id="cust-input" type="text" value={customerName} onChange={e=>setCustomerName(e.target.value)} className={`${inp} flex-1`}/>
-                <input id="phone-input" type="text" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="CellNo" className={`${inp} w-40`}/>
-                <div className="bg-[#4dbcc4] h-[22px] w-24 border border-[#888] flex items-center justify-end px-1 text-red-700 font-bold text-[11px]">0.00</div>
+        {/* ── Sales1/2/3/4 tabs ── */}
+        <div className="shrink-0 flex bg-white pl-2 pt-1 border-b border-[#888]">
+            {['Sales1','Sales2','Sales3','Sales4'].map(t => (
+                <button key={t} onClick={()=>setActiveSalesTab(t)}
+                    className={`px-4 py-0.5 text-[11px] font-bold border-t border-l border-r border-[#888] ${activeSalesTab===t ? 'bg-white text-slate-900' : 'bg-[#e0e0e0] text-slate-700 hover:bg-[#ececec]'}`}>{t}</button>
+            ))}
+        </div>
+
+        {/* ── Header form (matching screenshot) ── */}
+        <div className="shrink-0 bg-white border-b border-[#888]">
+            {/* Row A: Book | Type | Bill No | Date | Customer | Last BillNo */}
+            <div className="flex items-center px-2 py-1 gap-2 border-b border-[#d0d0d0]">
+                <label className={`${lbl} w-10 text-slate-900`}>Book</label>
+                <select value={counterName} onChange={e=>setCounterName(e.target.value)} className={`${inp} w-28 font-black`}>
+                    <option>COUNTER A</option><option>COUNTER B</option><option>COUNTER C</option>
+                </select>
+                <label className={`${lbl} ml-3`}>Type</label>
+                <select value={mode} onChange={e=>setMode(e.target.value)} className={`${inp} w-20 font-bold`}>
+                    <option value="CASH">Cash</option>
+                    <option value="CREDIT">Credit</option>
+                    <option value="CARD">Card</option>
+                    <option value="UPI">UPI</option>
+                </select>
+                <label className={`${lbl} ml-3 text-slate-900`}>Bill No</label>
+                <input type="text" value={billNo} onChange={e=>setBillNo(e.target.value)} className={`${inp} w-16 text-right font-bold`}/>
+                <label className={`${lbl} ml-3`}>Date</label>
+                <input type="text" value={date} onChange={e=>setDate(e.target.value)} className={`${inp} w-24 text-center font-bold`}/>
+                <label className={`${lbl} ml-4 text-slate-900`}>Customer <span className="text-[9px] text-blue-700 font-black">(Alt+C)</span>{mode === 'CREDIT' && <span className="text-red-600 font-black ml-1">*</span>}</label>
+                <div className="relative flex-1">
+                    <input id="cust-input" type="text" value={customerName}
+                        onChange={e=>{ setCustomerName(e.target.value); setPickedCustomerId(null); }}
+                        onBlur={()=>setTimeout(()=>setShowNameSuggest(false), 150)}
+                        onFocus={()=>{ if (nameSuggestions.length > 0) setShowNameSuggest(true); }}
+                        placeholder="COUNTER SALES" className={`${inp} w-full font-bold`}/>
+                    {showNameSuggest && nameSuggestions.length > 0 && (
+                        <div className="absolute top-[22px] left-0 bg-white border border-[#1a5276] shadow-2xl z-40 w-72 max-h-56 overflow-auto">
+                            {nameSuggestions.map((c, idx) => (
+                                <div key={c.id} onMouseDown={(e)=>{ e.preventDefault(); pickCustomer(c); }}
+                                    className={`px-2 py-1 border-b border-slate-200 cursor-pointer text-[11px] font-bold ${nameSuggestSelIdx === idx ? 'bg-yellow-200' : 'hover:bg-blue-100'}`}>
+                                    <div className="text-slate-900">{c.firstName} {c.lastName}</div>
+                                    <div className="text-emerald-700">{c.phoneNumber}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <div className="ml-2 w-3 h-3 rounded-full border border-slate-500 bg-white"/>
+                <label className="text-red-600 font-bold text-[11px] ml-3">Last BillNo</label>
+                <input type="text" value={lastBillNo} readOnly className={`${inp} w-10 text-center bg-[#f5f5f5] font-bold`}/>
             </div>
-            <div className="flex items-center px-1 py-0.5 gap-1 border-b border-[#c0c0c0]">
-                <label className={`${lbl} w-14`}>Rate Type</label>
-                <select value={rateType} onChange={e=>setRateType(e.target.value)} className={`${inp} w-20`}><option>ARate</option><option>BRate</option><option>CRate</option><option>DRate</option></select>
-                <label className={`${lbl} ml-2`}>Stock</label>
-                <input type="text" value={selectedProduct ? (selectedProduct.maxStock || selectedProduct.maxStkQty || 0) : '0'} readOnly className={`${inp} w-14 font-black text-center ${selectedProduct && (selectedProduct.maxStock || selectedProduct.maxStkQty) > (parseFloat(selectedProduct.minStock) || parseFloat(selectedProduct.minStkQty) || 10) ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`} title="Current Stock"/>
-                <input type="text" value={selectedProduct ? parseFloat(selectedProduct.mrpRate || 0).toFixed(2) : '0.00'} readOnly className={`${inp} w-20 text-blue-700 font-black text-right bg-[#f5f5f5]`} title="MRP Rate"/>
-                <input type="text" value={selectedProduct ? parseFloat(selectedProduct.salesRate || 0).toFixed(2) : '0.00'} readOnly className={`${inp} w-20 text-emerald-700 font-black text-right bg-[#f5f5f5]`} title="Sales Rate"/>
-                <input type="text" value={selectedProduct ? parseFloat(selectedProduct.purchaseRate || selectedProduct.costRate || 0).toFixed(2) : '0.00'} readOnly className={`${inp} w-20 font-black text-right bg-[#f5f5f5]`} title="Purchase Rate"/>
-                <label className="flex items-center gap-1 ml-1 cursor-pointer"><input type="checkbox" checked={igst} onChange={e=>setIgst(e.target.checked)}/><span className={`${lbl} text-red-700 font-black`}>IGST</span></label>
-                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={nonAcc} onChange={e=>setNonAcc(e.target.checked)}/><span className={lbl}>Non Acc</span></label>
-                <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={header} onChange={e=>setHeader(e.target.checked)}/><span className={lbl}>Header</span></label>
-                <label className={`${lbl} ml-2`}>Address</label>
-                <input type="text" value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} className={`${inp} flex-1`}/>
-                <div className="bg-[#4dbcc4] h-[22px] px-2 border border-[#888] flex items-center text-[10px] font-black text-slate-900 uppercase tracking-wider">{selectedProduct ? 'Selected' : '—'}</div>
-                <label className={`${lbl} ml-1`}>Sales Man</label>
-                <input type="text" value={salesMan} onChange={e=>setSalesMan(e.target.value)} className={`${inp} w-40 bg-[#ffffd0]`}/>
-            </div>
-            <div className="flex items-center px-1 py-0.5 gap-1">
-                <label className={`${lbl} w-14`}>Last BillNo</label>
-                <input type="text" value={lastBillNo} readOnly className={`${inp} w-10 text-center bg-[#f5f5f5]`}/>
-                <input type="text" value={selectedProduct ? (selectedProduct.itemName || '') : ''} readOnly className={`${inp} w-48 text-slate-900 font-black bg-yellow-50`} title="Selected Product Name" placeholder="Click a product to see stock"/>
-                <label className={`${lbl} ml-2`}>Size Stock</label>
-                <input type="text" value={selectedProduct ? (selectedProduct.size || selectedProduct.packingUnit || '-') : ''} readOnly className={`${inp} flex-1 max-w-[140px] text-slate-900 font-bold bg-[#f5f5f5]`}/>
-                <input type="text" value={selectedProduct ? `Min:${selectedProduct.minStock || selectedProduct.minStkQty || 0}` : '0'} readOnly className={`${inp} w-20 text-center bg-[#f5f5f5] text-slate-900 font-bold text-[10px]`} title="Minimum Stock"/>
-                <label className="flex items-center gap-1 cursor-pointer"><input type="radio" name="tax" checked={taxType==='WTax'} onChange={()=>setTaxType('WTax')}/><span className={lbl}>W.Tax</span></label>
-                <label className="flex items-center gap-1 cursor-pointer"><input type="radio" name="tax" checked={taxType==='WOTax'} onChange={()=>setTaxType('WOTax')}/><span className={lbl}>WO.Tax</span></label>
-                <label className="flex items-center gap-1 cursor-pointer"><input type="radio" name="tax" checked={taxType==='Exc'} onChange={()=>setTaxType('Exc')}/><span className={lbl}>Exc</span></label>
-                <div className="ml-auto flex items-center gap-1">
-                    <span className="text-red-700 font-black text-[14px] mr-2">{mode}</span>
-                    <label className={lbl}>Customer Ref</label>
-                    <input type="text" value={customerRef} onChange={e=>setCustomerRef(e.target.value)} className={`${inp} w-24`}/>
-                    <label className={`${lbl} ml-2`}>Quotation</label>
-                    <input type="text" value={quotation} onChange={e=>setQuotation(e.target.value)} className={`${inp} w-24 bg-[#ffffd0]`}/>
-                    <label className={`${lbl} ml-2`}>BundleNo</label>
-                    <input type="text" value={bundleNo} onChange={e=>setBundleNo(e.target.value)} className={`${inp} w-24`}/>
+
+            {/* Row B: Rate Type | GSTNo | OtherState | Home Delivery | -11.510 | Cell No */}
+            <div className="flex items-center px-2 py-1 gap-2 border-b border-[#d0d0d0]">
+                <label className={`${lbl} w-16`}>Rate Type -</label>
+                <select value={rateType} onChange={e=>setRateType(e.target.value)} className={`${inp} w-28 font-bold`}>
+                    <option>wholsale</option><option>retail</option><option>ARate</option><option>BRate</option><option>CRate</option><option>DRate</option>
+                </select>
+                <label className="flex items-center gap-1 ml-2 cursor-pointer"><input type="checkbox" checked={igst} onChange={e=>setIgst(e.target.checked)} className="accent-emerald-600"/><span className={`${lbl} text-blue-900`}>GSTNo</span></label>
+                <label className="flex items-center gap-1 ml-2 cursor-pointer"><input type="checkbox" checked={nonAcc} onChange={e=>setNonAcc(e.target.checked)}/><span className={lbl}>OtherState</span></label>
+                <label className="flex items-center gap-1 ml-2 cursor-pointer"><input type="checkbox" checked={header} onChange={e=>setHeader(e.target.checked)}/><span className={lbl}>Home Delivery</span></label>
+                <span className="ml-2 text-red-600 font-bold text-[12px]">-11.510</span>
+                <label className={`${lbl} ml-6`}>Cell No <span className="text-[9px] text-blue-700 font-black">(Alt+M)</span>{mode === 'CREDIT' && <span className="text-red-600 font-black ml-1">*</span>}</label>
+                <div className="relative flex-1">
+                    <input id="phone-input" type="text" value={customerPhone}
+                        onChange={e=>{ setCustomerPhone(e.target.value); setPickedCustomerId(null); }}
+                        onBlur={()=>setTimeout(()=>setShowCustSuggest(false), 150)}
+                        onFocus={()=>{ if (customerSuggestions.length > 0) setShowCustSuggest(true); }}
+                        placeholder="Type 3+ digits to lookup" className={`${inp} w-full font-bold`}/>
+                    {showCustSuggest && customerSuggestions.length > 0 && (
+                        <div className="absolute top-[22px] left-0 bg-white border border-[#1a5276] shadow-lg z-40 w-72 max-h-56 overflow-auto">
+                            {customerSuggestions.map((c, idx) => (
+                                <div key={c.id} onMouseDown={(e)=>{ e.preventDefault(); pickCustomer(c); }}
+                                    className={`px-2 py-1 border-b border-slate-200 cursor-pointer text-[11px] font-bold ${custSuggestSelIdx === idx ? 'bg-yellow-200' : 'hover:bg-blue-100'}`}>
+                                    <div className="text-slate-900">{c.firstName} {c.lastName}</div>
+                                    <div className="text-emerald-700">{c.phoneNumber}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Address + summary info bar (compact) */}
+            <div className="flex items-stretch bg-white border-b border-[#d0d0d0]">
+                <label className={`${lbl} px-2 flex items-center border-r border-[#d0d0d0] bg-[#eaf3f8] text-slate-900`}>Address{mode === 'CREDIT' && <span className="text-red-600 font-black ml-1">*</span>}</label>
+                <input type="text" value={customerAddress} onChange={e=>setCustomerAddress(e.target.value)} placeholder="Customer / delivery address" className="flex-1 h-[22px] px-2 text-[11px] font-bold outline-none border-r border-[#d0d0d0]"/>
+                <div className="px-3 h-[22px] flex items-center text-[11px] font-bold border-r border-[#d0d0d0] bg-[#eaf3f8] text-slate-900">No. of Units: <span className="ml-1 font-black">{totalItems.toFixed(2)}</span></div>
+                <div className="px-3 h-[22px] flex items-center text-[11px] font-bold bg-[#eaf3f8] text-slate-900">Cost: <span className="ml-1 font-black">₹{subTotal.toFixed(2)}</span></div>
+            </div>
         </div>
 
-        {/* Items table */}
+        {/* ── Main items grid ── */}
         <div className="flex-1 overflow-auto bg-white relative">
             <table className="w-full text-[11px] border-collapse">
-                <thead className="bg-[#3aa8b0] text-white sticky top-0 z-10">
+                <thead className="bg-[#6cc2ca] text-white sticky top-0 z-10">
                     <tr>
-                        <th className="border-r border-[#888] w-6 py-0.5"></th>
-                        <th className="border-r border-[#888] w-12 py-0.5 font-bold">SNo</th>
-                        <th className="border-r border-[#888] w-24 py-0.5 font-bold">Code</th>
-                        <th className="border-r border-[#888] py-0.5 font-bold">ItemName</th>
-                        <th className="border-r border-[#888] w-24 py-0.5 font-bold text-right pr-2">QTY</th>
-                        <th className="border-r border-[#888] w-24 py-0.5 font-bold text-right pr-2">Rate</th>
-                        <th className="border-r border-[#888] w-24 py-0.5 font-bold text-right pr-2">Amount</th>
-                        <th className="border-r border-[#888] w-24 py-0.5 font-bold text-right pr-2">Total</th>
-                        <th className="w-10 py-0.5 font-bold text-center">🗑</th>
+                        <th className="border border-[#3aa8b0] w-10 py-0.5 font-bold">Sl...</th>
+                        <th className="border border-[#3aa8b0] w-20 py-0.5 font-bold">Code</th>
+                        <th className="border border-[#3aa8b0] py-0.5 font-bold">ItemName</th>
+                        <th className="border border-[#3aa8b0] w-20 py-0.5 font-bold">Unit</th>
+                        <th className="border border-[#3aa8b0] w-20 py-0.5 font-bold">Qty</th>
+                        <th className="border border-[#3aa8b0] w-20 py-0.5 font-bold">Rate</th>
+                        <th className="border border-[#3aa8b0] w-20 py-0.5 font-bold">MrpRate</th>
+                        <th className="border border-[#3aa8b0] w-20 py-0.5 font-bold bg-[#16a085] text-white">Stock</th>
+                        <th className="border border-[#3aa8b0] w-24 py-0.5 font-bold bg-[#e8b84a] text-slate-900">Amount</th>
+                        <th className="border border-[#3aa8b0] w-8 py-0.5 font-bold text-center">✕</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {rows.map((r, i) => (<tr key={i} onClick={() => r.itemName && selectRowForStock(r)} className="border-b border-[#ddd] cursor-pointer hover:bg-blue-50" style={{background: selectedProduct && selectedProduct.code === r.code ? '#fef9c3' : (i === rows.length - 1 ? '#f0fdf4' : 'white')}}>
-                        <td className="w-6 text-center text-blue-700 font-bold text-[10px] border-r border-[#ddd]">{i === rows.length - 1 ? '▶*' : ''}</td>
-                        <td className="text-center border-r border-[#ddd] font-bold">{r.sno}</td>
-                        <td className="p-0 border-r border-[#ddd]">
-                            <input type="text" value={r.code || ''} onFocus={()=>openSearch(i)} onChange={e=>updateRow(i,'code',e.target.value)} className="w-full h-[22px] px-1 text-[11px] font-bold outline-none bg-[#9ae66e] focus:bg-[#bef5a0] text-center cursor-pointer"/>
-                        </td>
-                        <td className="p-0 border-r border-[#ddd]">
-                            <input type="text" value={r.itemName || ''} onChange={e=>updateRow(i,'itemName',e.target.value)} onFocus={()=>openSearch(i)} className="w-full h-[22px] px-2 text-[11px] font-bold outline-none focus:bg-yellow-50"/>
-                        </td>
-                        <td className="p-0 border-r border-[#ddd]">
-                            <input type="number" value={r.qty || ''} onChange={e=>updateRow(i,'qty',e.target.value)} className="w-full h-[22px] pr-2 text-[11px] font-bold outline-none focus:bg-yellow-50 text-right" placeholder="0.000"/>
-                        </td>
-                        <td className="p-0 border-r border-[#ddd]">
-                            <input type="number" value={r.rate || ''} onChange={e=>updateRow(i,'rate',e.target.value)} className="w-full h-[22px] pr-2 text-[11px] font-bold outline-none focus:bg-yellow-50 text-right" placeholder="0.00"/>
-                        </td>
-                        <td className="border-r border-[#ddd] pr-2 text-right font-bold">{r.amount || '0.00'}</td>
-                        <td className="border-r border-[#ddd] pr-2 text-right font-bold">{r.total || '0.00'}</td>
-                        <td className="text-center">
-                            {r.itemName ? (
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); if (confirm(`Remove ${r.itemName} from cart?`)) removeRow(i); }}
-                                    className="w-7 h-[22px] flex items-center justify-center bg-red-500 hover:bg-red-600 text-white font-black text-[13px] rounded transition active:scale-95"
-                                    title="Delete this item (or press Del when row focused)"
-                                >✕</button>
-                            ) : null}
-                        </td>
-                    </tr>))}
+                    {rows.map((r, i) => {
+                        const isFocused = selectedProduct && selectedProduct.code === r.code;
+                        const isLast = i === rows.length - 1;
+                        return (
+                        <tr key={i} onClick={() => r.itemName && selectRowForStock(r)}
+                            className="border-b border-[#e0e0e0] cursor-pointer hover:bg-blue-50"
+                            style={{background: isFocused ? '#fef9c3' : 'white'}}>
+                            <td className="text-center border-r border-[#e0e0e0] font-bold py-0.5">
+                                {isLast ? <span className="text-blue-700">▶</span> : r.sno}
+                            </td>
+                            <td className="p-0 border-r border-[#e0e0e0] relative">
+                                <input data-row={i} data-cell="code" type="text" value={r.code || ''}
+                                    onChange={e=>{ updateRow(i,'code',e.target.value); setSuggestRow(i); setSuggestField('code'); setSuggestSelIdx(0); setSearchRowIdx(i); }}
+                                    onFocus={()=>{ if (r.code) { setSuggestRow(i); setSuggestField('code'); setSuggestSelIdx(0); setSearchRowIdx(i); selectRowForStock(r); } }}
+                                    onBlur={()=>setTimeout(()=>setSuggestRow(p => p===i && suggestField==='code' ? -1 : p), 150)}
+                                    className="w-full h-[22px] px-1 text-[11px] font-bold outline-none text-center"/>
+                                {suggestRow === i && suggestField === 'code' && activeSuggestions.length > 0 && (
+                                    <div className="absolute z-50 left-0 top-[22px] bg-white border border-[#1a5276] shadow-2xl w-[460px] max-h-60 overflow-auto">
+                                        {activeSuggestions.map((p, sIdx) => (
+                                            <div key={p.code+'-'+sIdx}
+                                                data-suggest-idx={sIdx}
+                                                onMouseDown={(e)=>{ e.preventDefault(); pickItem(p); setSuggestRow(-1); }}
+                                                className={`flex items-center gap-3 px-3 py-1 text-[11px] cursor-pointer border-b border-slate-100 ${suggestSelIdx === sIdx ? 'bg-yellow-200' : 'hover:bg-blue-50'}`}>
+                                                <span className="font-black text-slate-500 w-12">{p.code}</span>
+                                                <span className="font-black text-slate-900 flex-1 truncate">{p.itemName}</span>
+                                                <span className="font-black text-emerald-700 text-right">₹{p.salesRate || p.mrpRate || 0}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </td>
+                            <td className="p-0 border-r border-[#e0e0e0] relative">
+                                <input ref={el=>{ itemNameInputsRef.current[i] = el; }} data-row={i} data-cell="itemName"
+                                    type="text" value={r.itemName || ''}
+                                    onChange={e=>{ updateRow(i,'itemName',e.target.value); setSuggestRow(i); setSuggestField('itemName'); setSuggestSelIdx(0); setSearchRowIdx(i); }}
+                                    onFocus={()=>{ if (r.itemName) { setSuggestRow(i); setSuggestField('itemName'); setSuggestSelIdx(0); setSearchRowIdx(i); selectRowForStock(r); } }}
+                                    onBlur={()=>setTimeout(()=>setSuggestRow(p => p===i && suggestField==='itemName' ? -1 : p), 150)}
+                                    className="w-full h-[22px] px-2 text-[11px] font-bold outline-none focus:bg-[#6ce87a]"
+                                    style={{background: isFocused && !isLast ? '#6ce87a' : undefined}}/>
+                                {suggestRow === i && suggestField === 'itemName' && activeSuggestions.length > 0 && (
+                                    <div id="suggest-dropdown" className="absolute z-50 left-0 top-[22px] bg-white border border-[#1a5276] shadow-2xl w-[460px] max-h-60 overflow-auto">
+                                        {activeSuggestions.map((p, sIdx) => (
+                                            <div key={p.code+'-'+sIdx}
+                                                data-suggest-idx={sIdx}
+                                                onMouseDown={(e)=>{ e.preventDefault(); pickItem(p); setSuggestRow(-1); }}
+                                                className={`flex items-center gap-3 px-3 py-1 text-[11px] cursor-pointer border-b border-slate-100 ${suggestSelIdx === sIdx ? 'bg-yellow-200' : 'hover:bg-blue-50'}`}>
+                                                <span className="font-black text-slate-500 w-12">{p.code}</span>
+                                                <span className="font-black text-slate-900 flex-1 truncate">{p.itemName}</span>
+                                                <span className="font-black text-emerald-700 text-right">₹{p.salesRate || p.mrpRate || 0}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </td>
+                            <td className="p-0 border-r border-[#e0e0e0] relative">
+                                <input type="text" list="unit-options" value={r.unit || ''}
+                                    data-row={i} data-cell="unit"
+                                    onChange={e=>{ updateRow(i,'unit',e.target.value); setUnitDropdownRow(-1); }}
+                                    onFocus={()=>{ const vs = getRowVariants(r); if (vs.length > 0) { setUnitDropdownRow(i); setUnitDropdownSelIdx(0); } }}
+                                    onBlur={()=>setTimeout(()=>setUnitDropdownRow(p => p === i ? -1 : p), 150)}
+                                    className="w-full h-[16px] px-2 text-[11px] font-bold outline-none focus:bg-yellow-50"/>
+                                {unitDropdownRow === i && (() => {
+                                    const variants = getRowVariants(r);
+                                    if (variants.length === 0) return null;
+                                    return (
+                                        <div className="absolute z-50 left-0 top-[22px] bg-white border border-[#1a5276] shadow-2xl w-56 max-h-60 overflow-auto">
+                                            <div className="bg-[#1a5276] text-white text-[10px] font-black uppercase tracking-widest px-2 py-1">Pick Size</div>
+                                            {variants.map((v, idx) => (
+                                                <div key={idx}
+                                                    onMouseDown={(e)=>{ e.preventDefault(); applyVariantToRow(i, v); }}
+                                                    className={`flex items-center justify-between px-2 py-1.5 cursor-pointer border-b border-slate-100 ${unitDropdownSelIdx === idx ? 'bg-yellow-200' : 'hover:bg-blue-50'}`}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="w-5 h-5 rounded bg-[#1a5276] text-white flex items-center justify-center font-black text-[10px]">{idx+1}</span>
+                                                        <span className="font-black text-slate-900 text-[12px]">{v.size}</span>
+                                                    </div>
+                                                    <span className="font-black text-emerald-700 text-[13px]">₹{parseFloat(v.rate).toFixed(2)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                            </td>
+                            <td className="p-0 border-r border-[#e0e0e0]">
+                                <input data-row={i} data-cell="qty" type="number" value={r.qty || ''}
+                                    onChange={e=>updateRow(i,'qty',e.target.value)}
+                                    onFocus={()=>{ if (r.itemName) selectRowForStock(r); }}
+                                    className="no-spin w-full h-[22px] pr-2 text-[11px] font-bold outline-none focus:bg-yellow-50 text-right"/>
+                            </td>
+                            <td className="p-0 border-r border-[#e0e0e0]">
+                                <input data-row={i} data-cell="rate" type="number" value={r.rate || ''}
+                                    onChange={e=>updateRow(i,'rate',e.target.value)}
+                                    onFocus={()=>{ if (r.itemName) selectRowForStock(r); }}
+                                    className="no-spin w-full h-[22px] pr-2 text-[11px] font-bold outline-none focus:bg-yellow-50 text-right"/>
+                            </td>
+                            <td className="border-r border-[#e0e0e0] pr-2 text-right font-bold">{r.mrpRate ? parseFloat(r.mrpRate).toFixed(2) : '0.00'}</td>
+                            <td className="border-r border-[#e0e0e0] text-center font-black">
+                                {(() => {
+                                    if (!r.itemName) return <span className="text-slate-400">—</span>;
+                                    const prod = pharmaItems.find(p => p.code === r.code || p.itemName === r.itemName);
+                                    if (!prod) return <span className="text-slate-400">—</span>;
+                                    const stk = prod.minStkQty != null ? prod.minStkQty : prod.minStock;
+                                    if (stk == null) return <span className="text-slate-400">—</span>;
+                                    const qtyUsed = parseFloat(r.qty) || 0;
+                                    const remaining = stk - qtyUsed;
+                                    const cls = remaining <= 0 ? 'text-red-700 bg-red-100' : remaining <= 5 ? 'text-orange-700 bg-orange-100' : 'text-emerald-700 bg-emerald-100';
+                                    return <span className={`px-2 py-0.5 rounded ${cls}`}>{remaining}{remaining <= 0 ? ' ⚠' : ''}</span>;
+                                })()}
+                            </td>
+                            <td className="border-r border-[#e0e0e0] pr-2 text-right font-bold">{r.amount || '0.00'}</td>
+                            <td className="text-center">
+                                {r.itemName ? (
+                                    <button onClick={(e) => { e.stopPropagation(); removeRow(i); }}
+                                        className="w-6 h-[22px] flex items-center justify-center bg-red-500 hover:bg-red-600 text-white font-black text-[12px]"
+                                        title="Delete">✕</button>
+                                ) : null}
+                            </td>
+                        </tr>);
+                    })}
                 </tbody>
             </table>
 
-            {showSearch && (
-                <div className="absolute left-1/4 top-2 bg-white border-2 border-[#7ba0b5] shadow-2xl z-30 w-[650px]">
-                    <div className="bg-[#d4e6f1] border-b-2 border-[#7ba0b5] px-2 py-1 flex items-center gap-2">
-                        <label className="text-[12px] font-bold">Search</label>
-                        <input ref={searchRef} type="text" value={searchText} onChange={e=>{setSearchText(e.target.value);setSearchSelIdx(0);}} placeholder="Type name or code... (↑↓ navigate, Enter select, Esc close)" className="flex-1 bg-white border border-[#7ba0b5] h-6 px-2 text-[12px] font-bold outline-none focus:border-[#1a5276]"/>
-                    </div>
-                    <table className="w-full text-[12px] border-collapse">
-                        <thead className="bg-[#eef5fb]"><tr>
-                            <th className="py-1 px-2 text-left border-r border-[#ccc] font-bold w-20">Code</th>
-                            <th className="py-1 px-2 text-left border-r border-[#ccc] font-bold">ItemName</th>
-                            <th className="py-1 px-2 text-right border-r border-[#ccc] font-bold w-24">Rate</th>
-                            <th className="py-1 px-2 text-right font-bold w-20">MRP</th>
-                        </tr></thead>
-                        <tbody className="max-h-96">
-                            {filteredSearchItems.length === 0 ? (
-                                <tr><td colSpan={4} className="py-6 text-center text-slate-700 font-bold">No items. Add in Item Master.</td></tr>
-                            ) : filteredSearchItems.slice(0, 15).map((it, i) => (
-                                <tr key={it.id || i} onClick={()=>pickItem(it)} className={`cursor-pointer border-b border-[#e0e0e0] ${searchSelIdx === i ? 'bg-[#2980b9] text-white' : 'bg-white hover:bg-blue-50'}`}>
-                                    <td className={`py-0.5 px-2 border-r border-[#e0e0e0] font-bold ${searchSelIdx===i?'text-white':''}`}>{it.code}</td>
-                                    <td className={`py-0.5 px-2 border-r border-[#e0e0e0] font-bold uppercase ${searchSelIdx===i?'text-white':''}`}>{it.itemName}</td>
-                                    <td className={`py-0.5 px-2 border-r border-[#e0e0e0] text-right ${searchSelIdx===i?'text-white':''}`}>{parseFloat(it.salesRate||0).toFixed(2)}</td>
-                                    <td className={`py-0.5 px-2 text-right ${searchSelIdx===i?'text-white':''}`}>{parseFloat(it.mrpRate||0).toFixed(2)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
         </div>
 
-        {/* Bottom: Hotkeys + Total + Summary */}
-        <div className="shrink-0 flex border-t border-[#888]" style={{background:'#e8e8e8'}}>
-            <div className="w-[400px] border-r border-[#888] p-1">
-                <div className="flex items-center gap-1 text-[11px] font-bold mb-0.5">
-                    <label>Points :</label><span className="bg-white border border-[#888] px-2 w-8 text-right">0</span>
-                    <span>+</span><span className="bg-white border border-[#888] px-2 w-8 text-right">0</span>
-                    <span>=</span><span className="bg-white border border-[#888] px-2 w-8 text-right">0</span>
-                    <span className="ml-auto bg-white border border-[#888] px-2 w-14 text-right">0.00</span>
+        {/* ── Selected Product info bar (shows when a row is clicked / item picked) ── */}
+        {selectedProduct && (() => {
+            const sp = selectedProduct;
+            const stockQty = sp.minStkQty != null ? sp.minStkQty : (sp.minStock != null ? sp.minStock : null);
+            const maxStock = sp.maxStkQty != null ? sp.maxStkQty : sp.maxStock;
+            const lowStock = stockQty != null && stockQty <= 5;
+            return (
+                <div className="shrink-0 flex items-center gap-3 px-3 py-0.5 border-t border-[#888] text-[10px] font-bold" style={{background:'#fef9c3'}}>
+                    <span className="px-2 py-0.5 bg-[#1a5276] text-white font-black uppercase tracking-wider text-[10px] rounded">Selected</span>
+                    <span className="text-slate-900 font-black">{sp.itemName}</span>
+                    <span className="text-slate-700">Code: <span className="font-black text-slate-900">{sp.code}</span></span>
+                    {sp.brand && <span className="text-slate-700">Brand: <span className="font-black text-slate-900">{sp.brand}</span></span>}
+                    {sp.unit && <span className="text-slate-700">Unit: <span className="font-black text-slate-900">{sp.unit}</span></span>}
+                    <span className={`px-2 py-0.5 rounded font-black ${lowStock ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-emerald-100 text-emerald-700 border border-emerald-300'}`}>
+                        Stock: {stockQty != null ? stockQty : '—'}{maxStock ? ` / ${maxStock}` : ''}
+                        {lowStock && ' ⚠ LOW'}
+                    </span>
+                    <span className="text-slate-700">Sales: <span className="font-black text-emerald-700">₹{sp.salesRate || 0}</span></span>
+                    <span className="text-slate-700">MRP: <span className="font-black text-slate-900">₹{sp.mrpRate || 0}</span></span>
+                    {sp.gstPercent != null && <span className="text-slate-700">GST: <span className="font-black text-slate-900">{sp.gstPercent}%</span></span>}
+                    {sp.hsnCode && <span className="text-slate-700">HSN: <span className="font-black text-slate-900">{sp.hsnCode}</span></span>}
+                    {sp.expiryDate && <span className="text-slate-700">Expiry: <span className="font-black text-slate-900">{new Date(sp.expiryDate).toLocaleDateString('en-IN', {month:'short', year:'numeric'})}</span></span>}
+                    <button onClick={()=>setSelectedProduct(null)} className="ml-auto text-slate-700 hover:text-red-600 font-black">✕</button>
                 </div>
-                <div className="flex items-center gap-1 text-[11px] font-bold mb-1">
-                    <label className="w-20">Debit Point</label><input type="text" value={debitPoint} onChange={e=>setDebitPoint(e.target.value)} className={`${inp} w-16`}/>
-                    <label className="ml-2">Remarks</label><input type="text" value={remarks} onChange={e=>setRemarks(e.target.value)} className={`${inp} flex-1`}/>
-                </div>
-                <div className="text-[10px] font-bold text-slate-900 space-y-0.5 border-t border-[#c0c0c0] pt-1">
-                    <div className="grid grid-cols-3 gap-1">
-                        <span>F1 - Save</span>
-                        <span>F3 - Discount% Focus</span>
-                        <span>F4 - Discount Focus</span>
-                        <span>F6 - Customer Focus</span>
-                        <span>F7 - Memory Save</span>
-                        <span>F11 - CellNo Focus</span>
-                        <span>F9 - Received Amount Focus</span>
-                        <span className="text-amber-700 font-black">F7 - Hold Bill</span>
-                        <span className="text-blue-700 font-black">F8 - Parked Bills</span>
-                        <span>↑↓ Navigate Row</span>
-                        <span>Enter - Select / Resume</span>
+            );
+        })()}
+
+        {/* ── Compact bottom: Summary (left) | Total + Checkout (center) | Payment Detail (right) ── */}
+        <div className="shrink-0 flex border-t border-[#888] bg-white">
+            {/* LEFT: Hotkeys + Summary table below */}
+            <div className="w-[320px] border-r border-[#888] text-[10px] bg-white flex flex-col">
+                {/* Hotkeys */}
+                <div className="text-[9px] font-bold text-slate-900 m-0.5">
+                    <div className="bg-[#1a5276] text-white px-2 py-0 text-[9px] uppercase tracking-widest font-black">⌨ Hotkeys</div>
+                    <div className="grid grid-cols-3 border border-[#aaa] border-t-0">
+                        <span className="px-2 py-0 border-r border-b border-[#aaa]">F1 - <u>S</u>ave</span>
+                        <span className="px-2 py-0 border-r border-b border-[#aaa]">F2 - <u>P</u>rint</span>
+                        <span className="px-2 py-0 border-b border-[#aaa]">F3 - Discount</span>
+                        <span className="px-2 py-0 border-r border-b border-[#aaa]">Alt+<u>C</u> - Customer</span>
+                        <span className="px-2 py-0 border-r border-b border-[#aaa]">Alt+<u>M</u> - Mobile</span>
+                        <span className="px-2 py-0 border-b border-[#aaa]">Alt+<u>I</u> - Item</span>
+                        <span className="px-2 py-0 border-r border-b border-[#aaa]">F6 - New Cust.</span>
+                        <span className="px-2 py-0 border-r border-b border-[#aaa]">F7 - Hold</span>
+                        <span className="px-2 py-0 border-b border-[#aaa]">F8 - Parked</span>
+                        <span className="px-2 py-0 border-r border-[#aaa] bg-emerald-100">F10 - <b>Checkout</b></span>
+                        <span className="px-2 py-0 border-r border-[#aaa]">F11 - Cell No</span>
+                        <span className="px-2 py-0">Esc - Close</span>
                     </div>
                 </div>
-                <div className="flex mt-1 border-t border-[#c0c0c0] pt-1">
-                    <button onClick={handleSave} className="flex-1 bg-[#4dbcc4] hover:bg-[#3aa8b0] border border-[#888] text-black font-bold py-0.5 text-[12px]">Save (F1)</button>
-                    <button onClick={handleHold} className="flex-1 bg-amber-400 hover:bg-amber-500 border border-[#888] text-black font-black py-0.5 text-[12px]">⏸ Hold (F7)</button>
-                    <button onClick={()=>setShowParkedModal(true)} className="flex-1 bg-blue-400 hover:bg-blue-500 border border-[#888] text-black font-black py-0.5 text-[12px] relative">
-                        🅿 Parked (F8)
-                        {parkedBills.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center">{parkedBills.length}</span>}
-                    </button>
-                    <button onClick={handleCancel} className="flex-1 bg-[#4dbcc4] hover:bg-[#3aa8b0] border border-[#888] text-black font-bold py-0.5 text-[12px]">Cancel</button>
-                </div>
-                <div className="flex mt-0.5">
-                    <button className="flex-1 bg-[#4dbcc4] hover:bg-[#3aa8b0] border border-[#888] text-black font-bold py-0.5 text-[12px]">First</button>
-                    <button className="flex-1 bg-[#4dbcc4] hover:bg-[#3aa8b0] border border-[#888] text-black font-bold py-0.5 text-[12px]">Prev</button>
-                    <button className="flex-1 bg-[#4dbcc4] hover:bg-[#3aa8b0] border border-[#888] text-black font-bold py-0.5 text-[12px]">Next</button>
-                    <button className="flex-1 bg-[#4dbcc4] hover:bg-[#3aa8b0] border border-[#888] text-black font-bold py-0.5 text-[12px]">Last</button>
-                    <button onClick={handlePrint} className="flex-1 bg-[#4dbcc4] hover:bg-[#3aa8b0] border border-[#888] text-black font-bold py-0.5 text-[12px]">Print (F2)</button>
-                    <button onClick={handlePdf} className="flex-1 bg-[#4dbcc4] hover:bg-[#3aa8b0] border border-[#888] text-black font-bold py-0.5 text-[12px]">Pdf</button>
-                </div>
-            </div>
-
-            <div className="flex-1 flex flex-col items-center justify-center py-2" style={{background:'#4dbcc4'}}>
-                <span className="text-red-700 font-black text-[16px] tracking-wide">Total</span>
-                <span className="text-[#1a1a7e] font-black text-[42px] leading-none">{grandTotal.toFixed(2)}</span>
-                <span className="text-red-700 font-black text-[16px] tracking-wide mt-1">Balance</span>
-                <span className="text-[#1a1a7e] font-black text-[28px] leading-none">{balance > 0 ? balance.toFixed(0) : '0'}</span>
-            </div>
-
-            <div className="w-[340px] border-l border-[#888] text-[12px]">
-                <table className="w-full border-collapse">
+                {/* Summary table — moved here from right panel */}
+                <table className="w-full border-collapse text-[10px] shrink-0 border-t border-[#888]">
                     <tbody>
                         <tr className="border-b border-[#ccc]">
-                            <td className="font-bold px-2 py-0.5 bg-white w-36">Total Items</td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc] w-20 font-black">{rows.filter(r=>r.itemName).length}</td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc] font-black">{totalItems.toFixed(0)}</td>
+                            <td className="font-bold px-2 py-0">Total Items</td>
+                            <td className="text-right px-2 py-0 border-l border-[#ccc] font-black">{rows.filter(r=>r.itemName).length}</td>
                         </tr>
                         <tr className="border-b border-[#ccc]">
-                            <td className="font-bold px-2 py-0.5 bg-white">Sub Total</td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc]"></td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc] font-bold">{subTotal.toFixed(2)}</td>
+                            <td className="font-bold px-2 py-0">Sub Total</td>
+                            <td className="text-right px-2 py-0 border-l border-[#ccc] font-bold">₹{subTotal.toFixed(2)}</td>
                         </tr>
                         <tr className="border-b border-[#ccc]">
-                            <td className="font-bold px-2 py-0.5 bg-white">Tax Amount</td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc]"></td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc] font-bold">{taxAmount.toFixed(2)}</td>
+                            <td className="font-bold px-2 py-0">Discount</td>
+                            <td className="p-0 border-l border-[#ccc]"><input id="disc-input" type="number" value={discount} onChange={e=>setDiscount(e.target.value)} className="no-spin w-full h-[16px] px-2 text-right font-bold outline-none focus:bg-yellow-50"/></td>
                         </tr>
                         <tr className="border-b border-[#ccc]">
-                            <td className="font-bold px-2 py-0.5 bg-white">Sal.Return Amt</td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc]"></td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc] font-bold">0.00</td>
-                        </tr>
-                        <tr className="border-b border-[#ccc]">
-                            <td className="font-bold px-2 py-0.5 bg-white">Discount</td>
-                            <td className="p-0 border-l border-[#ccc]"><input id="disc-input" type="number" value={discount} onChange={e=>setDiscount(e.target.value)} className="w-full h-[22px] px-2 text-right font-bold outline-none focus:bg-yellow-50"/></td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc] font-bold">{discAmt.toFixed(2)}</td>
-                        </tr>
-                        <tr className="border-b border-[#ccc]">
-                            <td className="font-bold px-2 py-0.5 bg-white">Transport Charges</td>
-                            <td className="p-0 border-l border-[#ccc]"><input type="number" value={transportCharges} onChange={e=>setTransportCharges(e.target.value)} className="w-full h-[22px] px-2 text-right font-bold outline-none focus:bg-yellow-50"/></td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc] font-bold">{transportAmt.toFixed(2)}</td>
+                            <td className="font-bold px-2 py-0">GST / Tax</td>
+                            <td className="text-right px-2 py-0 border-l border-[#ccc] font-bold">₹{taxAmount.toFixed(2)}</td>
                         </tr>
                         <tr>
-                            <td className="font-bold px-2 py-0.5 bg-white">Received Amt</td>
-                            <td className="p-0 border-l border-[#ccc]"><input id="recv-input" type="number" value={receivedAmt} onChange={e=>setReceivedAmt(e.target.value)} className="w-full h-[22px] px-2 text-right font-bold outline-none focus:bg-yellow-50"/></td>
-                            <td className="bg-white text-right px-2 py-0.5 border-l border-[#ccc] font-bold">{receivedA.toFixed(2)}</td>
+                            <td className="font-bold px-2 py-0">Remarks</td>
+                            <td className="p-0 border-l border-[#ccc]"><input type="text" value={remarks} onChange={e=>setRemarks(e.target.value)} className="w-full h-[16px] px-2 text-[10px] font-bold outline-none focus:bg-yellow-50"/></td>
+                        </tr>
+                    </tbody>
+                </table>
+                {/* Bill size selector */}
+                <div className="flex items-center px-1 py-0 gap-1 text-[9px] border-t border-[#ccc] mt-auto">
+                    <label className="font-black text-slate-900">Bill:</label>
+                    <select value={billSize} onChange={e=>setBillSize(e.target.value)} className="flex-1 bg-white border border-[#888] h-[16px] px-1 text-[9px] font-bold outline-none">
+                        {Object.entries(BILL_SIZES).map(([k,v]) => <option key={k} value={k}>{v.label} ({v.width})</option>)}
+                    </select>
+                </div>
+            </div>
+
+            {/* CENTER: Total + Checkout button */}
+            <div className="flex-1 flex flex-col items-center justify-center py-3 px-3" style={{background:'#6cc2ca'}}>
+                <span className="text-red-600 font-bold text-[12px] italic leading-none">TOTAL</span>
+                <span className="text-[#1a1a7e] font-black text-[28px] leading-none mt-1">₹{grandTotal.toFixed(2)}</span>
+                <button onClick={showCheckout ? confirmCheckout : openCheckout}
+                    className={`mt-2 px-6 py-2 ${showCheckout ? 'bg-emerald-700 hover:bg-emerald-600 border-emerald-900' : 'bg-emerald-600 hover:bg-emerald-500 border-emerald-800'} border-2 text-white font-black text-[13px] uppercase tracking-widest shadow-lg rounded transition active:scale-95`}>
+                    {showCheckout ? '✓ CONFIRM & SAVE' : '💰 CHECKOUT (F10)'}
+                </button>
+                {showCheckout && (
+                    <button onClick={()=>setShowCheckout(false)} className="mt-1 text-[10px] text-slate-700 hover:text-red-600 font-bold underline">✕ Cancel</button>
+                )}
+            </div>
+
+            {/* RIGHT: Payment Detail only (Summary moved to LEFT panel) */}
+            <div className="w-[340px] border-l border-[#888] bg-white flex flex-col">
+                {/* Payment Detail — always rendered, fields disabled until Checkout clicked */}
+                <div className={`bg-gradient-to-r from-[#5b3f8f] to-[#7c5cb5] py-1 text-center transition`}>
+                    <h3 className="text-white font-black text-[12px] uppercase tracking-widest">Payment Detail {!showCheckout && <span className="text-cyan-200 text-[9px] normal-case ml-1">(Click CHECKOUT to enable)</span>}</h3>
+                </div>
+                <table className="w-full text-[12px]">
+                    <tbody>
+                        <tr className="border-b border-slate-300 bg-[#f5f5f5]">
+                            <td className="font-black px-2 py-0.5 uppercase tracking-wider text-slate-900 text-[11px]">Bill Amount</td>
+                            <td className="text-right px-2 py-0.5 font-black text-[#1a5276] text-[13px]">₹{grandTotal.toFixed(2)}</td>
+                        </tr>
+                        <tr className="border-b border-slate-200">
+                            <td className="font-bold px-2 py-0 text-slate-900 text-[11px]">💵 Cash</td>
+                            <td className="p-0 border-l border-slate-200">
+                                <input type="number" value={payCash} onChange={e=>setPayCash(e.target.value)} disabled={!showCheckout}
+                                    placeholder="0.00" className={`no-spin w-full h-[16px] px-2 text-right font-black text-[13px] outline-none ${showCheckout ? 'focus:bg-yellow-50 bg-white' : 'bg-slate-100 text-slate-400'}`}/>
+                            </td>
+                        </tr>
+                        <tr className="border-b border-slate-200">
+                            <td className="font-bold px-2 py-0 text-slate-900 text-[11px]">📱 UPI / GPay</td>
+                            <td className="p-0 border-l border-slate-200">
+                                <input type="number" value={payUpi} onChange={e=>setPayUpi(e.target.value)} disabled={!showCheckout}
+                                    placeholder="0.00" className={`no-spin w-full h-[16px] px-2 text-right font-black text-[13px] outline-none ${showCheckout ? 'focus:bg-yellow-50 bg-white' : 'bg-slate-100 text-slate-400'}`}/>
+                            </td>
+                        </tr>
+                        <tr className="border-b border-slate-200">
+                            <td className="font-bold px-2 py-0 text-slate-900 text-[11px]">💳 Card</td>
+                            <td className="p-0 border-l border-slate-200">
+                                <input type="number" value={payCard} onChange={e=>setPayCard(e.target.value)} disabled={!showCheckout}
+                                    placeholder="0.00" className={`no-spin w-full h-[16px] px-2 text-right font-black text-[13px] outline-none ${showCheckout ? 'focus:bg-yellow-50 bg-white' : 'bg-slate-100 text-slate-400'}`}/>
+                            </td>
+                        </tr>
+                        <tr className="border-b border-slate-200">
+                            <td className="font-bold px-2 py-0 text-slate-900 text-[11px]">📋 Credit</td>
+                            <td className="p-0 border-l border-slate-200">
+                                <input type="number" value={payCredit} onChange={e=>setPayCredit(e.target.value)} disabled={!showCheckout}
+                                    placeholder="0.00" className={`no-spin w-full h-[16px] px-2 text-right font-black text-[13px] outline-none ${showCheckout ? 'focus:bg-yellow-50 bg-white' : 'bg-slate-100 text-slate-400'}`}/>
+                            </td>
+                        </tr>
+                        <tr className={`${!showCheckout ? 'bg-slate-50' : Math.abs(splitBalance) < 0.01 ? 'bg-emerald-50' : splitBalance > 0 ? 'bg-red-50' : 'bg-amber-50'}`}>
+                            <td className="font-black px-2 py-0.5 uppercase tracking-wider text-slate-900 text-[11px]">Balance</td>
+                            <td className={`text-right px-2 py-0.5 font-black text-[13px] ${!showCheckout ? 'text-slate-400' : Math.abs(splitBalance) < 0.01 ? 'text-emerald-700' : splitBalance > 0 ? 'text-red-700' : 'text-amber-700'}`}>
+                                {showCheckout ? (
+                                    <>{splitBalance < 0 ? '+ ' : ''}₹{Math.abs(splitBalance).toFixed(2)}{Math.abs(splitBalance) < 0.01 && ' ✓'}{splitBalance < -0.01 && ' (Change)'}</>
+                                ) : <>₹{grandTotal.toFixed(2)}</>}
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -689,6 +1293,7 @@ table{width:100%;border-collapse:collapse}
             <button onClick={handlePrint} className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-[11px] font-black uppercase">🖨 Print (F2)</button>
             <button onClick={()=>setShowToast(false)} className="text-white hover:text-yellow-300">✕</button>
         </div>)}
+
 
         {/* ═══ PARKED BILLS MODAL ═══ */}
         {showParkedModal && (<div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">

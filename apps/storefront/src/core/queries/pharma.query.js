@@ -6,7 +6,7 @@ const TTL = 60_000; // 1 min cache
 // ══════════════════════════════════════════════════════════════
 // ITEMS
 // ══════════════════════════════════════════════════════════════
-const ITEM_FIELDS = `id createdAt updatedAt code itemName tamilName category groupName brand hsnCode barcode unit packingUnit size taxName mfr purchaseRate salesRate mrpRate costRate cRate rateA rateB rateC rateD lastPurchaseRate lastSaleRate gstPercent discount profitMargin incentivePct batchNo mfgDate expiryDate serialNo minStock maxStock minStkQty maxStkQty isWeightBased isExpiryEnabled allowExpiry sizesJson`;
+const ITEM_FIELDS = `id createdAt updatedAt code itemName tamilName category groupName brand hsnCode barcode upcCode unit packingUnit size taxName mfr purchaseRate salesRate mrpRate costRate cRate rateA rateB rateC rateD lastPurchaseRate lastSaleRate gstPercent discount profitMargin incentivePct batchNo mfgDate expiryDate serialNo minStock maxStock minStkQty maxStkQty isWeightBased isExpiryEnabled allowExpiry sizesJson`;
 
 export class ListItemsQuery {
     async execute() {
@@ -30,6 +30,62 @@ export class UpdateItemCommand {
         const data = await gql(`mutation UpdateItem($id: ID!, $input: PharmaItemInput!) { updatePharmaItem(id: $id, input: $input) { ${ITEM_FIELDS} } }`, { useAdmin: true, variables: { id, input } });
         invalidateCache('pharma:items');
         return data.updatePharmaItem;
+    }
+}
+
+// Sync a PharmaItem to Vendure catalog (creates Product + ProductVariant)
+export class SyncItemToVendureCommand {
+    async execute(item) {
+        const slug = String(item.itemName || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || `item-${item.code}`;
+
+        // Step 1: create Product
+        const productMutation = `
+            mutation CreateProduct($input: CreateProductInput!) {
+                createProduct(input: $input) { id name slug }
+            }`;
+        const productInput = {
+            enabled: true,
+            translations: [{
+                languageCode: 'en',
+                name: item.itemName,
+                slug: `${slug}-${item.code}`,
+                description: `${item.brand || ''} ${item.category || ''}`.trim(),
+            }],
+        };
+        const productData = await gql(productMutation, { useAdmin: true, variables: { input: productInput } });
+        const productId = productData?.createProduct?.id;
+        if (!productId) throw new Error('Vendure product creation failed');
+
+        // Step 2: create ProductVariant
+        const variantMutation = `
+            mutation CreateVariants($input: [CreateProductVariantInput!]!) {
+                createProductVariants(input: $input) { id sku price }
+            }`;
+        const priceInMinor = Math.round((parseFloat(item.salesRate) || 0) * 100); // paise
+        const variantInput = [{
+            productId,
+            sku: String(item.barcode || item.upcCode || item.code || `SKU-${Date.now()}`),
+            price: priceInMinor,
+            stockOnHand: parseInt(item.minStock || 0, 10) || 0,
+            trackInventory: 'TRUE',
+            translations: [{ languageCode: 'en', name: item.itemName }],
+        }];
+        await gql(variantMutation, { useAdmin: true, variables: { input: variantInput } });
+        invalidateCache('pharma:items');
+        return productId;
+    }
+}
+
+// Fetch tax rates from Vendure Admin API
+export class ListTaxRatesQuery {
+    async execute() {
+        return cachedFetch('vendure:taxRates', async () => {
+            const data = await gql(`query TaxRates { taxRates { items { id name value enabled } } }`, { useAdmin: true });
+            return data?.taxRates?.items || [];
+        }, TTL);
     }
 }
 

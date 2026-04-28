@@ -19,8 +19,7 @@ function detectRole(currentUser, adminRoles = []) {
 
 export class VendureLoginCommand {
     async execute(username, password) {
-        // ═══ Single login mutation — detects role from returned permissions ═══
-        const data = await gql(`
+        const LOGIN_QUERY = `
             mutation VendureLogin($username: String!, $password: String!) {
                 login(username: $username, password: $password) {
                     __typename
@@ -33,14 +32,27 @@ export class VendureLoginCommand {
                     ... on NativeAuthStrategyError { message }
                 }
             }
-        `, { useAdmin: true, skipAuth: true, variables: { username, password } });
+        `;
+        const tryLogin = (id) => gql(LOGIN_QUERY, { useAdmin: true, skipAuth: true, variables: { username: id, password } });
 
-        const result = data.login;
-        if (result.__typename !== 'CurrentUser') {
-            throw new Error(result.message || 'Invalid credentials.');
+        // 1) Try as-typed
+        let data = await tryLogin(username.trim());
+        let result = data.login;
+
+        // 2) If failed and the input has no '@', retry with default domain (PosCreateUserCommand appends '@avsecom.local')
+        if (result.__typename !== 'CurrentUser' && !username.includes('@')) {
+            const retryEmail = `${username.trim()}@avsecom.local`;
+            const retryData = await tryLogin(retryEmail);
+            if (retryData.login.__typename === 'CurrentUser') {
+                result = retryData.login;
+            }
         }
 
-        // Role detection from channel permissions (single-hit, no extra queries)
+        if (result.__typename !== 'CurrentUser') {
+            throw new Error(result.message || 'Invalid username or password.');
+        }
+
+        // Role detection from channel permissions
         const permissions = result.channels?.[0]?.permissions || [];
         const adminPerms = ['SuperAdmin', 'UpdateAdministrator', 'CreateAdministrator', 'DeleteAdministrator'];
         const isAdmin = adminPerms.some(p => permissions.includes(p));

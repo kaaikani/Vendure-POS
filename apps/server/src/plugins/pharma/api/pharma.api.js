@@ -15,6 +15,7 @@ export const pharmaApiExtensions = gql`
         brand: String!
         hsnCode: String!
         barcode: String!
+        upcCode: String!
         unit: String!
         packingUnit: String!
         size: String!
@@ -59,6 +60,7 @@ export const pharmaApiExtensions = gql`
         brand: String
         hsnCode: String
         barcode: String
+        upcCode: String
         unit: String
         packingUnit: String
         size: String

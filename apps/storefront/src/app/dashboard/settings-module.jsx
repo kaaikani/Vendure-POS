@@ -251,9 +251,32 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
     const lbl = "text-[12px] font-bold text-slate-900";
 
     const sections = [
+        { id: 'company', label: 'Company', icon: Building2 },
         { id: 'user-creation', label: 'User Creation', icon: UserPlus },
         { id: 'barcode-design', label: 'Barcode Design', icon: ScanLine },
     ];
+
+    // ── Delete a company ──
+    const handleCompanyDelete = (id) => {
+        const c = companies.find(x => x.id === id);
+        if (!c) return;
+        if (!confirm(`Delete company "${c.name}"? This cannot be undone.`)) return;
+        const updated = companies.filter(x => x.id !== id);
+        setCompanies(updated); saveCompanies(updated);
+        if (activeCompanyId === id) {
+            setActiveCompanyId('');
+            localStorage.removeItem(ACTIVE_COMPANY_KEY);
+        }
+        if (editingId === id) {
+            setEditingId(null);
+            setForm({ name: '', gst: '', phone: '', email: '', address: '', state: '', pincode: '', financialYear: '2026-2027' });
+        }
+    };
+
+    const resetForm = () => {
+        setEditingId(null);
+        setForm({ name: '', gst: '', phone: '', email: '', address: '', state: '', pincode: '', financialYear: '2026-2027' });
+    };
 
     return (<div className="flex flex-col h-[85vh] rounded-md overflow-hidden font-sans shadow-xl border border-slate-400" style={{background:'#eaf2f8'}}>
         {/* Title bar */}
@@ -282,6 +305,112 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
 
             {/* Content area */}
             <div className="flex-1 p-6 overflow-auto bg-[#eaf2f8]">
+
+                {/* ═══ COMPANY MANAGEMENT ═══ */}
+                {section === 'company' && (<div>
+                    <h2 className="text-lg font-black text-[#1a5276] mb-4 flex items-center gap-2"><Building2 size={18}/> Company Management</h2>
+                    <div className="grid grid-cols-[420px_1fr] gap-4">
+
+                        {/* Form */}
+                        <div className="bg-white border border-[#7a9ca8] p-5 space-y-3 self-start">
+                            <h3 className="text-[13px] font-black text-slate-900 mb-2 flex items-center gap-1 border-b border-[#c0d0d8] pb-2">
+                                {editingId ? <><Edit3 size={14} className="text-orange-600"/> Update Company</> : <><Building2 size={14} className="text-[#2980b9]"/> New Company</>}
+                            </h3>
+
+                            <div>
+                                <label className={`${lbl} block mb-1`}>Company Name *</label>
+                                <input type="text" value={form.name} onChange={e=>setForm({...form, name: e.target.value})} placeholder="e.g., Karthi Supermarket" className={`${inp} w-full`}/>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className={`${lbl} block mb-1`}>GST Number</label>
+                                    <input type="text" value={form.gst} onChange={e=>setForm({...form, gst: e.target.value.toUpperCase()})} placeholder="33XXXXX1234X1Z1" maxLength={15} className={`${inp} w-full`}/>
+                                </div>
+                                <div>
+                                    <label className={`${lbl} block mb-1`}>Phone</label>
+                                    <input type="tel" value={form.phone} onChange={e=>setForm({...form, phone: e.target.value})} placeholder="9876543210" className={`${inp} w-full`}/>
+                                </div>
+                            </div>
+                            <div>
+                                <label className={`${lbl} block mb-1`}>Email</label>
+                                <input type="email" value={form.email} onChange={e=>setForm({...form, email: e.target.value})} placeholder="info@company.com" className={`${inp} w-full`}/>
+                            </div>
+                            <div>
+                                <label className={`${lbl} block mb-1`}>Address</label>
+                                <textarea value={form.address} onChange={e=>setForm({...form, address: e.target.value})} placeholder="Street, City" rows={2} className={`${inp} w-full resize-none py-1`}/>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className={`${lbl} block mb-1`}>State</label>
+                                    <input type="text" value={form.state} onChange={e=>setForm({...form, state: e.target.value})} placeholder="Tamil Nadu" className={`${inp} w-full`}/>
+                                </div>
+                                <div>
+                                    <label className={`${lbl} block mb-1`}>Pincode</label>
+                                    <input type="text" value={form.pincode} onChange={e=>setForm({...form, pincode: e.target.value})} placeholder="600001" className={`${inp} w-full`}/>
+                                </div>
+                            </div>
+                            <div>
+                                <label className={`${lbl} block mb-1`}>Financial Year</label>
+                                <input type="text" value={form.financialYear} onChange={e=>setForm({...form, financialYear: e.target.value})} placeholder="2026-2027" className={`${inp} w-full`}/>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2 border-t border-[#c0d0d8]">
+                                {editingId ? (
+                                    <>
+                                        <button onClick={handleCompanyUpdate} className="flex-1 px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white font-black text-[12px] uppercase tracking-wider flex items-center justify-center gap-1"><Save size={13}/> Update</button>
+                                        <button onClick={resetForm} className="px-3 py-2 bg-slate-300 hover:bg-slate-400 text-slate-900 font-black text-[12px] uppercase">Cancel</button>
+                                    </>
+                                ) : (
+                                    <button onClick={handleCompanyCreate} className="flex-1 px-3 py-2 bg-[#2980b9] hover:bg-[#1a5276] text-white font-black text-[12px] uppercase tracking-wider flex items-center justify-center gap-1"><Save size={13}/> Save Company</button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* List */}
+                        <div className="bg-white border border-[#7a9ca8] overflow-hidden self-start">
+                            <div className="bg-[#1a5276] text-white py-2 px-3 text-[11px] font-black uppercase tracking-wider flex items-center justify-between">
+                                <span>Saved Companies ({companies.length})</span>
+                                <span className="text-[10px] text-cyan-200">⭐ = Active (shown in header)</span>
+                            </div>
+                            {companies.length === 0 ? (
+                                <div className="p-10 text-center text-slate-700 font-bold text-sm">No companies yet. Create one on the left.</div>
+                            ) : (
+                                <table className="w-full text-[11px]">
+                                    <thead className="bg-[#d4e6f1]">
+                                        <tr>
+                                            <th className="py-1.5 px-2 text-left font-black text-slate-900 w-8"></th>
+                                            <th className="py-1.5 px-2 text-left font-black text-slate-900">Name</th>
+                                            <th className="py-1.5 px-2 text-left font-black text-slate-900">GST</th>
+                                            <th className="py-1.5 px-2 text-left font-black text-slate-900">Phone</th>
+                                            <th className="py-1.5 px-2 text-center font-black text-slate-900 w-32">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {companies.map(c => (
+                                            <tr key={c.id} className={`border-b border-slate-200 ${activeCompanyId === c.id ? 'bg-yellow-50' : 'hover:bg-blue-50'}`}>
+                                                <td className="py-1.5 px-2 text-center">
+                                                    {activeCompanyId === c.id ? <span className="text-orange-500 text-lg">⭐</span> : <span className="text-slate-300">☆</span>}
+                                                </td>
+                                                <td className="py-1.5 px-2 font-black text-slate-900">{c.name}</td>
+                                                <td className="py-1.5 px-2 font-bold text-slate-700">{c.gst || '—'}</td>
+                                                <td className="py-1.5 px-2 font-bold text-slate-700">{c.phone || '—'}</td>
+                                                <td className="py-1.5 px-2">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        {activeCompanyId !== c.id && (
+                                                            <button onClick={() => handleSelectCompany(c.id)} title="Set as active" className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px]">Set Active</button>
+                                                        )}
+                                                        <button onClick={() => loadCompanyToForm(c)} title="Edit" className="p-1 bg-slate-200 hover:bg-orange-200 text-slate-800"><Edit3 size={12}/></button>
+                                                        <button onClick={() => handleCompanyDelete(c.id)} title="Delete" className="p-1 bg-slate-200 hover:bg-red-300 text-slate-800"><Trash2 size={12}/></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                </div>)}
 
                 {/* USER CREATION */}
                 {section === 'user-creation' && (<div>

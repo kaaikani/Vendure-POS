@@ -1,6 +1,14 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { ListItemsQuery, CreateItemCommand, UpdateItemCommand, DeleteItemCommand } from '../../core/queries/pharma.query';
+import { ListItemsQuery, CreateItemCommand, UpdateItemCommand, DeleteItemCommand, ListTaxRatesQuery, SyncItemToVendureCommand } from '../../core/queries/pharma.query';
+
+const DEFAULT_TAXES = [
+    { id: 'exempt', name: 'Exempted', value: 0 },
+    { id: 'gst5', name: 'GST 5%', value: 5 },
+    { id: 'gst12', name: 'GST 12%', value: 12 },
+    { id: 'gst18', name: 'GST 18%', value: 18 },
+    { id: 'gst28', name: 'GST 28%', value: 28 },
+];
 
 export default function ItemMasterModule() {
     const [items, setItems] = useState([]);
@@ -9,13 +17,14 @@ export default function ItemMasterModule() {
     const [search, setSearch] = useState('');
     const [searchField, setSearchField] = useState('ItemName');
     const [loading, setLoading] = useState(false);
+    const [taxList, setTaxList] = useState(DEFAULT_TAXES);
     const itemNameRef = useRef(null);
 
     // Form state
     const [form, setForm] = useState({});
 
     // ONE API call on mount
-    useEffect(() => { loadAll(); }, []);
+    useEffect(() => { loadAll(); loadTaxes(); }, []);
 
     const loadAll = async () => {
         setLoading(true);
@@ -28,8 +37,32 @@ export default function ItemMasterModule() {
         setLoading(false);
     };
 
+    const loadTaxes = async () => {
+        try {
+            const vendureTaxes = await new ListTaxRatesQuery().execute();
+            // Merge Vendure tax rates with defaults (unique by name)
+            const merged = [...DEFAULT_TAXES];
+            (vendureTaxes || []).forEach(t => {
+                if (!merged.find(m => m.name.toLowerCase() === (t.name || '').toLowerCase())) {
+                    merged.push({ id: t.id, name: t.name, value: t.value });
+                }
+            });
+            setTaxList(merged);
+        } catch (e) { console.error('Tax load failed:', e); }
+    };
+
+    const handleAddCustomTax = () => {
+        const name = prompt('Enter tax name (e.g. "VAT 12%")');
+        if (!name?.trim()) return;
+        const val = prompt('Enter tax % value (e.g. 12)');
+        const value = parseFloat(val) || 0;
+        const newTax = { id: `custom-${Date.now()}`, name: name.trim(), value };
+        setTaxList(prev => [...prev, newTax]);
+        updateForm('taxName', newTax.name);
+    };
+
     const blankForm = (code) => ({
-        code: String(code), brand: 'NA', category: 'Na', itemName: '', hsnSac: '',
+        code: String(code), upcCode: '', brand: 'NA', category: 'Na', itemName: '', hsnSac: '',
         taxName: 'GST 5%', mfr: '', unit: 'NA', packingUnit: '0.00',
         mrpRate: '0.00', salesRate: '0.00', incentivePct: '0.0',
         costRate: '0.00', cRate: '0.00', minStkQty: '0.00', maxStkQty: '0.00',
@@ -70,7 +103,27 @@ export default function ItemMasterModule() {
     };
 
     const handleSave = async () => {
-        if (!form.itemName?.trim()) return alert('Item Name is required.');
+        // Required fields validation
+        const required = [
+            { key: 'code', label: 'Code' },
+            { key: 'itemName', label: 'Item Name' },
+            { key: 'category', label: 'Category' },
+            { key: 'unit', label: 'Unit' },
+            { key: 'taxName', label: 'Tax' },
+        ];
+        const missing = required.filter(r => !String(form[r.key] || '').trim() || String(form[r.key]).trim().toLowerCase() === 'na');
+        if (missing.length > 0) {
+            return alert(`Please fill the following required fields:\n\n• ${missing.map(m => m.label).join('\n• ')}`);
+        }
+        // Required numeric fields (must be > 0)
+        const numericReq = [
+            { key: 'salesRate', label: 'Sales Rate' },
+            { key: 'mrpRate', label: 'MRP' },
+        ];
+        const zeroFields = numericReq.filter(r => !(parseFloat(form[r.key]) > 0));
+        if (zeroFields.length > 0) {
+            return alert(`The following rates must be greater than 0:\n\n• ${zeroFields.map(m => m.label).join('\n• ')}`);
+        }
         // Only send fields accepted by PharmaItemInput — strip entity-only fields
         const input = {
             code: String(form.code || ''),
@@ -81,6 +134,7 @@ export default function ItemMasterModule() {
             brand: String(form.brand || ''),
             hsnCode: String(form.hsnCode || form.hsnSac || ''),
             barcode: String(form.barcode || ''),
+            upcCode: String(form.upcCode || ''),
             unit: String(form.unit || 'NA'),
             packingUnit: String(form.packingUnit || ''),
             size: String(form.size || ''),
@@ -113,8 +167,18 @@ export default function ItemMasterModule() {
             sizes: (form.sizes || []).map(s => ({ size: String(s.size || ''), rate: parseFloat(s.rate) || 0 })),
         };
         try {
-            if (mode === 'new') await new CreateItemCommand().execute(input);
-            else if (mode === 'edit') await new UpdateItemCommand().execute(form.id, input);
+            if (mode === 'new') {
+                await new CreateItemCommand().execute(input);
+                // Also sync to Vendure catalog (non-blocking on failure)
+                try {
+                    await new SyncItemToVendureCommand().execute(input);
+                } catch (syncErr) {
+                    console.warn('Vendure catalog sync failed:', syncErr);
+                    alert(`Item saved, but Vendure catalog sync failed:\n${syncErr.message}`);
+                }
+            } else if (mode === 'edit') {
+                await new UpdateItemCommand().execute(form.id, input);
+            }
             await loadAll();
             setMode('view');
         } catch (err) { alert(err.message); }
@@ -136,6 +200,30 @@ export default function ItemMasterModule() {
     const updateSize = (idx, field, val) => setForm(f => ({ ...f, sizes: f.sizes.map((s, i) => i === idx ? { ...s, [field]: val } : s) }));
     const addSizeRow = () => setForm(f => ({ ...f, sizes: [...(f.sizes || []), { size: '', rate: '0.00' }] }));
 
+    // Keyboard navigation: Enter / ↓ → next field, ↑ → previous field
+    const handleKeyNav = (e) => {
+        if (!['Enter', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
+        // Ignore if inside a textarea or the native select is open
+        const tag = e.target.tagName;
+        if (tag === 'TEXTAREA') return;
+        // For SELECT: let up/down change the option; only handle Enter
+        if (tag === 'SELECT' && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;
+
+        e.preventDefault();
+        const container = e.currentTarget;
+        const focusable = Array.from(
+            container.querySelectorAll('input:not([readonly]):not([disabled]), select:not([disabled]), button:not([disabled])')
+        ).filter(el => el.type !== 'hidden' && el.offsetParent !== null);
+        const idx = focusable.indexOf(e.target);
+        if (idx === -1) return;
+        const nextIdx = e.key === 'ArrowUp' ? idx - 1 : idx + 1;
+        const next = focusable[Math.max(0, Math.min(focusable.length - 1, nextIdx))];
+        if (next) {
+            next.focus();
+            if (next.select) next.select();
+        }
+    };
+
     const filteredItems = items.filter(it => {
         if (!search) return true;
         const s = search.toLowerCase();
@@ -155,17 +243,19 @@ export default function ItemMasterModule() {
 
         <div className="flex-1 flex overflow-hidden">
             {/* ── LEFT: Form ── */}
-            <div className="flex-1 p-3 overflow-auto" style={{ background: '#b8dce2' }}>
+            <div className="flex-1 p-3 overflow-auto" style={{ background: '#b8dce2' }} onKeyDown={handleKeyNav}>
                 <div className="mb-2">
                     <h2 className="text-xl font-black text-[#16a085] tracking-wider">{mode === 'new' ? 'NEW PRODUCT' : mode === 'edit' ? 'EDIT PRODUCT' : 'PRODUCT DETAIL'}</h2>
                 </div>
 
                 {/* Top grid: 2 columns */}
                 <div className="space-y-1.5">
-                    {/* Code */}
+                    {/* Code + UPC Code */}
                     <div className="flex items-center gap-2">
                         <label className={`${labelStyle} w-24`}>Code</label><span className="text-slate-900 font-bold">:</span>
                         <input type="text" value={form.code || ''} onChange={e=>updateForm('code',e.target.value)} readOnly={!isEditing} className={`${inp()} w-32 ml-1`}/>
+                        <label className={`${labelStyle} ml-6`}>UPC Code</label><span className="text-slate-900 font-bold">:</span>
+                        <input type="text" value={form.upcCode || ''} onChange={e=>updateForm('upcCode',e.target.value)} readOnly={!isEditing} placeholder="Scan / enter UPC" className={`${inp()} w-48 ml-1`}/>
                     </div>
                     {/* Brand */}
                     <div className="flex items-center gap-2">
@@ -184,10 +274,27 @@ export default function ItemMasterModule() {
                         <label className={`${labelStyle} ml-6 text-right leading-tight`}>HSN /<br/>SAC</label><span className="text-slate-900 font-bold">:</span>
                         <input type="text" value={form.hsnSac || ''} onChange={e=>updateForm('hsnSac',e.target.value)} readOnly={!isEditing} className={`${inp()} w-36 ml-1`}/>
                     </div>
-                    {/* Tax Name + MFR */}
-                    <div className="flex items-center gap-2">
-                        <label className={`${labelStyle} w-24`}>Tax Name</label><span className="text-slate-900 font-bold">:</span>
-                        <input type="text" value={form.taxName || ''} onChange={e=>updateForm('taxName',e.target.value)} readOnly={!isEditing} className={`${inp()} w-56 ml-1`}/>
+                    {/* Tax Section (horizontal) */}
+                    <div className="flex items-center gap-2 p-2 bg-[#c8e0e8] border border-[#7ba0b5] rounded-sm">
+                        <label className={`${labelStyle} font-black`}>Tax</label><span className="text-slate-900 font-bold">:</span>
+                        <select
+                            value={form.taxName || ''}
+                            onChange={e => {
+                                const sel = taxList.find(t => t.name === e.target.value);
+                                updateForm('taxName', e.target.value);
+                                if (sel) updateForm('gstPercent', sel.value);
+                            }}
+                            disabled={!isEditing}
+                            className={`${inp()} w-48 ml-1 font-bold`}
+                        >
+                            <option value="">-- Select Tax --</option>
+                            {taxList.map(t => (
+                                <option key={t.id} value={t.name}>{t.name}{t.value > 0 ? ` (${t.value}%)` : ''}</option>
+                            ))}
+                        </select>
+                        {isEditing && (
+                            <button type="button" onClick={handleAddCustomTax} className="bg-[#16a085] hover:bg-[#1abc9c] text-white font-bold px-2 py-0.5 text-[11px] border border-[#0e6655]" title="Add custom tax">+ Add Tax</button>
+                        )}
                         <label className={`${labelStyle} ml-6`}>MFR</label><span className="text-slate-900 font-bold">:</span>
                         <input type="text" value={form.mfr || ''} onChange={e=>updateForm('mfr',e.target.value)} readOnly={!isEditing} className={`${inp()} flex-1 max-w-xs ml-1`}/>
                     </div>
@@ -198,21 +305,23 @@ export default function ItemMasterModule() {
                         <label className={`${labelStyle} ml-6 leading-tight`}>Packing<br/>Unit</label><span className="text-slate-900 font-bold">:</span>
                         <input type="text" value={form.packingUnit || ''} onChange={e=>updateForm('packingUnit',e.target.value)} readOnly={!isEditing} className={`${inp()} w-32 ml-1 text-right`}/>
                     </div>
-                    {/* MRP Rate + Sales Rate + Incentive% */}
+                    {/* Sales Rate + Product Rate + Cost Rate + MRP Rate (all in one row) */}
                     <div className="flex items-center gap-2">
-                        <label className={`${labelStyle} w-24`}>MRP Rate</label><span className="text-slate-900 font-bold">:</span>
-                        <input type="text" value={form.mrpRate || ''} onChange={e=>updateForm('mrpRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-32 ml-1 text-right`}/>
-                        <label className={`${labelStyle} ml-6`}>Sales Rate</label><span className="text-slate-900 font-bold">:</span>
-                        <input type="text" value={form.salesRate || ''} onChange={e=>updateForm('salesRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-32 ml-1 text-right`}/>
-                        <label className={`${labelStyle} ml-6`}>Incentive%</label>
-                        <input type="text" value={form.incentivePct || ''} onChange={e=>updateForm('incentivePct',e.target.value)} readOnly={!isEditing} className={`${inp()} w-20 ml-1 text-right`}/>
+                        <label className={`${labelStyle} w-24`}>Sales Rate</label><span className="text-slate-900 font-bold">:</span>
+                        <input type="text" value={form.salesRate || ''} onChange={e=>updateForm('salesRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-28 ml-1 text-right`}/>
+                        <label className={`${labelStyle} ml-4`}>Product Rate</label><span className="text-slate-900 font-bold">:</span>
+                        <input type="text" value={form.purchaseRate || ''} onChange={e=>updateForm('purchaseRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-28 ml-1 text-right`}/>
+                        <label className={`${labelStyle} ml-4`}>Cost Rate</label><span className="text-slate-900 font-bold">:</span>
+                        <input type="text" value={form.costRate || ''} onChange={e=>updateForm('costRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-28 ml-1 text-right`}/>
+                        <label className={`${labelStyle} ml-4`}>MRP</label><span className="text-slate-900 font-bold">:</span>
+                        <input type="text" value={form.mrpRate || ''} onChange={e=>updateForm('mrpRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-28 ml-1 text-right`}/>
                     </div>
-                    {/* Cost Rate + CRate */}
+                    {/* Incentive% + CRate */}
                     <div className="flex items-center gap-2">
-                        <label className={`${labelStyle} w-24`}>Cost Rate</label><span className="text-slate-900 font-bold">:</span>
-                        <input type="text" value={form.costRate || ''} onChange={e=>updateForm('costRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-32 ml-1 text-right`}/>
-                        <label className={`${labelStyle} ml-6`}>CRate</label><span className="text-slate-900 font-bold">:</span>
-                        <input type="text" value={form.cRate || ''} onChange={e=>updateForm('cRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-32 ml-1 text-right`}/>
+                        <label className={`${labelStyle} w-24`}>Incentive%</label><span className="text-slate-900 font-bold">:</span>
+                        <input type="text" value={form.incentivePct || ''} onChange={e=>updateForm('incentivePct',e.target.value)} readOnly={!isEditing} className={`${inp()} w-28 ml-1 text-right`}/>
+                        <label className={`${labelStyle} ml-4`}>CRate</label><span className="text-slate-900 font-bold">:</span>
+                        <input type="text" value={form.cRate || ''} onChange={e=>updateForm('cRate',e.target.value)} readOnly={!isEditing} className={`${inp()} w-28 ml-1 text-right`}/>
                     </div>
                     {/* MinStkQty + MaxStkQty + Allow Expiry */}
                     <div className="flex items-center gap-2">

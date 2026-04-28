@@ -14,6 +14,7 @@ import PosModule from './pos-module';
 import BarcodeModule from './barcode-module';
 import DashboardModule from './dashboard-module';
 import ReportModule from './report-module';
+import CustomerModule from './customer-module';
 import { PosListUsersQuery, PosCreateUserCommand, PosUpdateUserCommand, PosDeleteUserCommand } from '../../core/queries/auth.query';
 
 // ── User Management Module ──
@@ -236,6 +237,28 @@ export default function VendureDashboard() {
     const [activeTab, setActiveTab] = useState(null);
     const [settingsSection, setSettingsSection] = useState('user-creation');
     const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+    const [activeCompany, setActiveCompany] = useState({ name: 'AVS ECOM PRIVATE LIMITED', financialYear: '2026-2027' });
+
+    // Read active company from localStorage and refresh when window regains focus / settings closes
+    useEffect(() => {
+        const refresh = () => {
+            try {
+                const list = JSON.parse(localStorage.getItem('pharma_companies') || '[]');
+                const activeId = localStorage.getItem('pharma_active_company') || '';
+                const active = list.find(c => c.id === activeId) || list[0];
+                if (active && active.name) {
+                    setActiveCompany({ name: active.name, financialYear: active.financialYear || '2026-2027' });
+                }
+            } catch {}
+        };
+        refresh();
+        window.addEventListener('focus', refresh);
+        window.addEventListener('storage', refresh);
+        return () => {
+            window.removeEventListener('focus', refresh);
+            window.removeEventListener('storage', refresh);
+        };
+    }, [activeTab]);
 
     // Auth guard: check session on mount
     useEffect(() => {
@@ -283,6 +306,7 @@ export default function VendureDashboard() {
         { id: 'category', label: 'Products (Vendure)', icon: Grid },
         { id: 'barcode', label: 'Barcode', icon: ScanLine },
         { id: 'ledger', label: 'Supplier Ledger', icon: BookOpen },
+        { id: 'customers', label: 'Customers', icon: User },
         { id: 'report', label: 'Reports', icon: FileText },
         { id: 'users', label: 'User Management', icon: Users },
         { id: 'settings', label: 'Settings', icon: Settings },
@@ -304,6 +328,7 @@ export default function VendureDashboard() {
                 case 'category': return isAdmin ? <ProductsModule /> : null;
                 case 'barcode': return isAdmin ? <BarcodeModule /> : null;
                 case 'ledger': return isAdmin ? <LedgerModule /> : null;
+                case 'customers': return isAdmin ? <CustomerModule /> : null;
                 case 'report': return isAdmin ? <ReportModule /> : null;
                 case 'users': return isAdmin ? <UserManagementModule /> : null;
                 case 'settings': return isAdmin ? <SettingsModule section={settingsSection} onChangeSection={setSettingsSection}/> : null;
@@ -347,7 +372,7 @@ export default function VendureDashboard() {
     const toolbarItems = [
         { id: 'dashboard', label: 'Account\nMaster', icon: ClipboardList, bg: '#e74c3c' },
         { id: 'ledger', label: 'Supplier', icon: BookOpen, bg: '#3498db' },
-        { id: 'users', label: 'Customer', icon: User, bg: '#2ecc71' },
+        { id: 'customers', label: 'Customer', icon: User, bg: '#2ecc71' },
         { id: 'category', label: 'Category', icon: Grid, bg: '#f39c12' },
         { id: 'inventory', label: 'Inventory', icon: Box, bg: '#9b59b6' },
         { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c' },
@@ -374,14 +399,37 @@ export default function VendureDashboard() {
     // Home/welcome screen
     const showHome = activeTab === 'home' || activeTab === null;
 
+    // ── SALES (POS) → Full-screen mode for admin too ──
+    if (activeTab === 'pos') {
+        return (
+            <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+                {/* Slim top bar with company name + Close button */}
+                <div className="h-7 flex items-center justify-between px-3 shrink-0" style={{background:'linear-gradient(90deg, #1a5276, #2980b9)'}}>
+                    <div className="flex items-center gap-2">
+                        <span className="text-white text-xs font-black tracking-[3px]">{activeCompany.name}</span>
+                        <span className="text-cyan-100 text-[10px] font-bold ml-2">— {activeCompany.financialYear}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px]">
+                        <span className="text-cyan-100 font-bold">{session.displayName}</span>
+                        <button onClick={() => setActiveTab('home')} title="Close (back to Dashboard)" className="px-3 py-0.5 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded">✕ Close</button>
+                    </div>
+                </div>
+                {/* Full POS module */}
+                <div className="flex-1 overflow-hidden">
+                    <PosModule />
+                </div>
+            </div>
+        );
+    }
+
     // ── ADMIN ROLE: Classic POS Software Layout ──
     return (<div className="flex flex-col h-screen font-sans select-none" style={{background:'linear-gradient(135deg, #1a5276 0%, #2e86c1 30%, #85c1e9 60%, #d4e6f1 100%)'}}>
 
       {/* ═══ ROW 1: Blue title bar ═══ */}
       <div className="h-7 flex items-center justify-between px-3 shrink-0" style={{background:'linear-gradient(90deg, #1a5276, #2980b9)'}}>
         <div className="flex items-center gap-2">
-          <span className="text-white text-xs font-black tracking-[3px]">AVS ECOM PRIVATE LIMITED</span>
-          <span className="text-cyan-100 text-[10px] font-bold ml-2">— 2026-2027</span>
+          <span className="text-white text-xs font-black tracking-[3px]">{activeCompany.name}</span>
+          <span className="text-cyan-100 text-[10px] font-bold ml-2">— {activeCompany.financialYear}</span>
         </div>
         <div className="flex items-center gap-3 text-[10px]">
           <span className="text-cyan-100 font-bold">{session.displayName}</span>
@@ -416,6 +464,7 @@ export default function VendureDashboard() {
               <div className="fixed inset-0 z-40" onClick={()=>setSettingsMenuOpen(false)}/>
               <div className="absolute left-0 top-full mt-0.5 w-60 bg-white border-2 border-[#1a5276] shadow-2xl z-50" style={{color:'#000'}}>
                 {[
+                  { id: 'company', label: 'Company' },
                   { id: 'user-creation', label: 'User Creation' },
                   { id: 'barcode-design', label: 'Barcode Design' },
                 ].map(s => (
@@ -498,7 +547,7 @@ export default function VendureDashboard() {
           <span>Ready</span>
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/>
         </div>
-        <span className="text-[9px] text-[#2c3e50] font-bold">AVS ECOM PRIVATE LIMITED (2026-2027)</span>
+        <span className="text-[9px] text-[#2c3e50] font-bold">{activeCompany.name} ({activeCompany.financialYear})</span>
         <span className="text-[9px] text-[#34495e]">{new Date().toLocaleString('en-IN', {weekday:'short', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true})}</span>
       </div>
     </div>);

@@ -12,6 +12,7 @@ export class PharmaItem extends VendureEntity {
     @Column({ type: 'varchar', default: '' }) brand;
     @Column({ type: 'varchar', default: '' }) hsnCode;
     @Column({ type: 'varchar', default: '' }) barcode;
+    @Column({ type: 'varchar', default: '' }) upcCode;
     @Column({ type: 'varchar', default: 'NA' }) unit;
     @Column({ type: 'varchar', default: '' }) packingUnit;
     @Column({ type: 'varchar', default: '' }) size;

@@ -61,13 +61,14 @@ export default function LedgerModule() {
     const [selectedSupplier, setSelectedSupplier] = useState(null);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
 
-    // Add Supplier Modal
+    // Add Supplier Modal — now also captures the first invoice in same flow
     const [addSupplierOpen, setAddSupplierOpen] = useState(false);
-    const [supplierForm, setSupplierForm] = useState({ name:'', contact:'', gst:'', address:'' });
+    const [supplierForm, setSupplierForm] = useState({ name:'', contact:'', gst:'', address:'', invoiceNumber:'', amount:'', creditDays:'30', date:'' });
 
-    // Add Invoice Modal
+    // Add Invoice Modal (used for adding subsequent invoices to existing supplier)
     const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
     const [invoiceForm, setInvoiceForm] = useState({ invoiceNumber:'', amount:'', creditDays:'30', date:'' });
+    const [invoiceFromCard, setInvoiceFromCard] = useState(null); // supplier obj when adding from list card
 
     // Add Payment Modal
     const [payModalOpen, setPayModalOpen] = useState(false);
@@ -112,57 +113,131 @@ export default function LedgerModule() {
 
     // ── Supplier form ──
     const openAddSupplier = () => {
-        setSupplierForm({ name:'', contact:'', gst:'', address:'' });
+        setSupplierForm({ name:'', contact:'', gst:'', address:'', invoiceNumber:'', amount:'', creditDays:'30', date: new Date().toISOString().split('T')[0] });
         setAddSupplierOpen(true);
     };
-    const submitNewSupplier = () => {
-        const { name, contact, gst, address } = supplierForm;
+    const submitNewSupplier = async () => {
+        const { name, contact, gst, address, invoiceNumber, amount, creditDays, date } = supplierForm;
         if (!name.trim() || !contact.trim()) return alert('Supplier Name and Mobile Number are required.');
-        // Check duplicate
+
         const existing = ledgers.find(l => l.contactNumber === contact.trim());
-        if (existing) return alert(`Supplier with mobile "${contact}" already exists: ${existing.partyName}`);
-        // Save to localStorage as supplier registry (no invoice yet)
-        const suppliers = JSON.parse(localStorage.getItem('supplier_registry') || '[]');
-        const dup = suppliers.find(s => s.contactNumber === contact.trim());
-        if (dup) return alert(`Supplier "${dup.name}" with this mobile already registered.`);
-        suppliers.push({ name: name.trim(), contactNumber: contact.trim(), gstNumber: gst.trim(), address: address.trim() });
-        localStorage.setItem('supplier_registry', JSON.stringify(suppliers));
+        // Also check local registry (suppliers with no invoices yet, stored in localStorage)
+        const localRegistry = JSON.parse(localStorage.getItem('supplier_registry') || '[]');
+        const localExisting = localRegistry.find(s => s.contactNumber === contact.trim());
+
+        // Mobile uniqueness — block if same number is registered to a DIFFERENT name.
+        const existingName = (existing?.partyName || localExisting?.name || '').trim().toLowerCase();
+        if (existingName && existingName !== name.trim().toLowerCase()) {
+            return alert(`Mobile "${contact}" is already registered to "${existing?.partyName || localExisting?.name}".\n\nOne mobile can belong to only one supplier. Use a different mobile, or update the existing supplier instead of creating a new one.`);
+        }
+
+        const amt = parseFloat(amount);
+        const hasInvoice = invoiceNumber.trim() && amt > 0;
+
+        // Same supplier (same mobile + same name) — adding a NEW invoice flow
+        if (existing && !hasInvoice) {
+            const goNow = confirm(`Supplier "${existing.partyName}" already exists with this mobile.\n\nClick OK to open their page and add a new invoice.`);
+            setAddSupplierOpen(false);
+            if (goNow) {
+                const supplierObj = groupBySupplier(ledgers).find(s => s.contactNumber === contact.trim());
+                if (supplierObj) goToSupplierDetail(supplierObj);
+            }
+            return;
+        }
+
+        // Optional duplicate-invoice check — same supplier + same invoice number
+        if (existing && hasInvoice) {
+            const dupInv = ledgers.find(l => l.contactNumber === contact.trim() && l.invoiceNumber.toLowerCase() === invoiceNumber.trim().toLowerCase());
+            if (dupInv) return alert(`Invoice "${invoiceNumber}" already exists for this supplier. Use a different invoice number.`);
+        }
+
+        // Update local registry only for brand-new suppliers
+        if (!existing) {
+            const suppliers = JSON.parse(localStorage.getItem('supplier_registry') || '[]');
+            const dup = suppliers.find(s => s.contactNumber === contact.trim());
+            if (!dup) {
+                suppliers.push({ name: name.trim(), contactNumber: contact.trim(), gstNumber: gst.trim(), address: address.trim() });
+                localStorage.setItem('supplier_registry', JSON.stringify(suppliers));
+            }
+        }
+
+        // Create the invoice (ledger entry) if details provided
+        if (hasInvoice) {
+            try {
+                await new CreateLedgerCommand().execute({
+                    type: 'SUPPLIER',
+                    partyName: existing ? existing.partyName : name.trim(),
+                    contactNumber: contact.trim(),
+                    gstNumber: existing ? (existing.gstNumber || gst.trim()) : gst.trim(),
+                    address: existing ? (existing.address || address.trim()) : address.trim(),
+                    invoiceNumber: invoiceNumber.trim(),
+                    invoiceDate: new Date(date).toISOString(),
+                    amount: Math.round(amt),
+                    creditDays: parseInt(creditDays) || 30,
+                });
+                await fetchData();
+            } catch (err) {
+                alert('Failed to save invoice: ' + err.message);
+                return;
+            }
+        }
+
         setAddSupplierOpen(false);
-        // Open supplier detail immediately
-        goToSupplierDetail({ name: name.trim(), contactNumber: contact.trim(), gstNumber: gst.trim(), address: address.trim(), invoices: [], totalAmount: 0, totalPaid: 0, totalBalance: 0 });
+        // Navigate to supplier detail (reuse existing data when supplier was already there)
+        const updatedLedgers = await new GetLedgersQuery().execute('SUPPLIER');
+        setLedgers(updatedLedgers);
+        const refreshed = groupBySupplier(updatedLedgers).find(s => s.contactNumber === contact.trim());
+        goToSupplierDetail(refreshed || { name: name.trim(), contactNumber: contact.trim(), gstNumber: gst.trim(), address: address.trim(), invoices: [], totalAmount: 0, totalPaid: 0, totalBalance: 0 });
     };
 
-    // ── Invoice form ──
-    const openAddInvoice = () => {
+    // Quick add invoice from supplier card (without opening detail page)
+    const openQuickInvoice = (supplier, e) => {
+        e?.stopPropagation();
+        setInvoiceFromCard(supplier);
         setInvoiceForm({ invoiceNumber:'', amount:'', creditDays:'30', date: new Date().toISOString().split('T')[0] });
         setAddInvoiceOpen(true);
     };
-    const submitNewInvoice = async () => {
+    const submitQuickInvoice = async () => {
         const { invoiceNumber, amount, creditDays, date } = invoiceForm;
         if (!invoiceNumber.trim() || !amount) return alert('Invoice Number and Amount are required.');
         const amt = parseFloat(amount);
         if (!amt || amt <= 0) return alert('Invalid amount.');
+        const supplier = invoiceFromCard || selectedSupplier;
+        if (!supplier) return alert('Supplier missing.');
+        // Block ONLY same supplier + same invoice number (different invoices for same supplier are allowed)
+        const dupInv = ledgers.find(l => l.contactNumber === supplier.contactNumber && l.invoiceNumber.toLowerCase() === invoiceNumber.trim().toLowerCase());
+        if (dupInv) return alert(`Invoice "${invoiceNumber}" already exists for ${supplier.name}. Use a different invoice number.`);
         try {
             await new CreateLedgerCommand().execute({
                 type: 'SUPPLIER',
-                partyName: selectedSupplier.name,
-                contactNumber: selectedSupplier.contactNumber,
-                gstNumber: selectedSupplier.gstNumber,
-                address: selectedSupplier.address,
+                partyName: supplier.name,
+                contactNumber: supplier.contactNumber,
+                gstNumber: supplier.gstNumber,
+                address: supplier.address,
                 invoiceNumber: invoiceNumber.trim(),
                 invoiceDate: new Date(date).toISOString(),
                 amount: Math.round(amt),
                 creditDays: parseInt(creditDays) || 30,
             });
             setAddInvoiceOpen(false);
+            setInvoiceFromCard(null);
             await fetchData();
-            // Refresh supplier detail
-            const updatedLedgers = await new GetLedgersQuery().execute('SUPPLIER');
-            setLedgers(updatedLedgers);
-            const refreshed = groupBySupplier(updatedLedgers).find(s => s.contactNumber === selectedSupplier.contactNumber);
-            if (refreshed) setSelectedSupplier(refreshed);
+            if (selectedSupplier?.contactNumber === supplier.contactNumber) {
+                const updatedLedgers = await new GetLedgersQuery().execute('SUPPLIER');
+                setLedgers(updatedLedgers);
+                const refreshed = groupBySupplier(updatedLedgers).find(s => s.contactNumber === supplier.contactNumber);
+                if (refreshed) setSelectedSupplier(refreshed);
+            }
         } catch (err) { alert(err.message); }
     };
+
+    // ── Invoice form (used inside supplier-detail view) ──
+    const openAddInvoice = () => {
+        setInvoiceFromCard(null); // detail-view path uses selectedSupplier
+        setInvoiceForm({ invoiceNumber:'', amount:'', creditDays:'30', date: new Date().toISOString().split('T')[0] });
+        setAddInvoiceOpen(true);
+    };
+    const submitNewInvoice = submitQuickInvoice;
 
     // ── Payment form ──
     const openAddPayment = () => {
@@ -429,42 +504,47 @@ export default function LedgerModule() {
             </div>
 
             {/* Add Invoice Modal */}
-            {addInvoiceOpen && (
-                <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden">
-                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative">
-                            <button onClick={() => setAddInvoiceOpen(false)} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
-                            <div className="inline-flex p-3 rounded-full bg-teal-500/20 mb-3"><Receipt size={24} className="text-teal-400"/></div>
-                            <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Add Invoice</h2>
-                            <p className="font-bold text-sm mt-1 text-slate-900">{selectedSupplier.name}</p>
-                            {selectedSupplier.gstNumber && <p className="text-xs text-slate-700 mt-0.5">GST: {selectedSupplier.gstNumber}</p>}
+            {addInvoiceOpen && renderAddInvoiceModal()}
+        </div>);
+    }
+
+    function renderAddInvoiceModal() {
+        const supplier = invoiceFromCard || selectedSupplier;
+        if (!supplier) return null;
+        return (<div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative">
+                    <button onClick={() => { setAddInvoiceOpen(false); setInvoiceFromCard(null); }} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
+                    <div className="inline-flex p-3 rounded-full bg-teal-500/20 mb-3"><Receipt size={24} className="text-teal-400"/></div>
+                    <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Add Invoice</h2>
+                    <p className="font-bold text-sm mt-1 text-slate-900">{supplier.name}</p>
+                    <p className="text-xs text-slate-700 mt-0.5">📞 {supplier.contactNumber}{supplier.gstNumber ? ` • GST: ${supplier.gstNumber}` : ''}</p>
+                </div>
+                <div className="p-6 bg-slate-50 space-y-4">
+                    <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Supplier's Invoice Number *</label>
+                        <input autoFocus type="text" value={invoiceForm.invoiceNumber} onChange={e => setInvoiceForm({...invoiceForm, invoiceNumber: e.target.value})} placeholder="e.g. DT-INV-2026-001" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
+                        <p className="text-[10px] text-slate-700 mt-1 font-bold">Type the bill number printed on supplier's invoice slip.</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Amount (₹) *</label>
+                            <input type="number" value={invoiceForm.amount} onChange={e => setInvoiceForm({...invoiceForm, amount: e.target.value})} placeholder="25000" className="w-full border border-slate-300 rounded-xl p-3.5 text-lg font-black outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                         </div>
-                        <div className="p-6 bg-slate-50 space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Invoice Number *</label>
-                                <input type="text" value={invoiceForm.invoiceNumber} onChange={e => setInvoiceForm({...invoiceForm, invoiceNumber: e.target.value})} placeholder="Supplier's invoice number" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Amount (₹) *</label>
-                                    <input type="number" value={invoiceForm.amount} onChange={e => setInvoiceForm({...invoiceForm, amount: e.target.value})} placeholder="25000" className="w-full border border-slate-300 rounded-xl p-3.5 text-lg font-black outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Credit Days</label>
-                                    <input type="number" value={invoiceForm.creditDays} onChange={e => setInvoiceForm({...invoiceForm, creditDays: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3.5 text-lg font-black outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Invoice Date</label>
-                                <input type="date" value={invoiceForm.date} onChange={e => setInvoiceForm({...invoiceForm, date: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
-                            </div>
-                            <button onClick={submitNewInvoice} className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-teal-500/30 active:scale-[0.98]">
-                                Create Invoice
-                            </button>
+                        <div>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Credit Days</label>
+                            <input type="number" value={invoiceForm.creditDays} onChange={e => setInvoiceForm({...invoiceForm, creditDays: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3.5 text-lg font-black outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
                         </div>
                     </div>
+                    <div>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Invoice Date</label>
+                        <input type="date" value={invoiceForm.date} onChange={e => setInvoiceForm({...invoiceForm, date: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
+                    </div>
+                    <button onClick={submitQuickInvoice} className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-teal-500/30 active:scale-[0.98]">
+                        Create Invoice
+                    </button>
                 </div>
-            )}
+            </div>
         </div>);
     }
 
@@ -605,6 +685,10 @@ export default function LedgerModule() {
                       <p className={`text-sm font-black ${s.totalBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>₹{s.totalBalance.toLocaleString()}</p>
                     </div>
                   </div>
+                  <button onClick={(e) => openQuickInvoice(s, e)}
+                    className="mt-3 w-full py-2 bg-teal-50 hover:bg-teal-100 border border-teal-200 hover:border-teal-400 text-teal-700 rounded-lg font-black text-xs uppercase tracking-widest transition flex items-center justify-center gap-1">
+                    <Plus size={14}/> Add Invoice
+                  </button>
                 </div>
               ))}
             </div>
@@ -677,19 +761,20 @@ export default function LedgerModule() {
         </div>
       )}
 
-      {/* Add Supplier Modal */}
+      {/* Add Supplier Modal — captures supplier details + (optional) first invoice */}
       {addSupplierOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden my-4">
             <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-center text-white relative">
               <button onClick={() => setAddSupplierOpen(false)} className="absolute top-4 right-4 text-slate-700 hover:text-white transition"><XCircle size={22}/></button>
               <div className="inline-flex p-3 rounded-full bg-teal-500/20 mb-3"><User size={24} className="text-teal-400"/></div>
               <h2 className="text-lg font-black uppercase tracking-widest text-teal-400">Create Supplier</h2>
+              <p className="text-[10px] text-slate-700 mt-1 font-bold">Mobile is the unique identifier — same supplier = same mobile</p>
             </div>
             <div className="p-6 bg-slate-50 space-y-4">
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Supplier Name *</label>
-                <input type="text" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} placeholder="e.g., Karthi Traders" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
+                <input type="text" value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} placeholder="e.g., Durga Traders" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Mobile Number *</label>
@@ -703,12 +788,28 @@ export default function LedgerModule() {
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-700 block mb-1.5">Address</label>
                 <textarea value={supplierForm.address} onChange={e => setSupplierForm({...supplierForm, address: e.target.value})} placeholder="e.g., 12, Anna Nagar, Chennai" rows={2} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white resize-none"/>
               </div>
+              {/* First invoice section — optional */}
+              <div className="border-t-2 border-dashed border-slate-300 pt-4 mt-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-teal-700 mb-1">First Invoice (optional)</p>
+                <p className="text-[10px] text-slate-700 font-bold mb-3">If supplier already gave you a bill, type it here. Else skip — add later.</p>
+                <div className="space-y-3">
+                    <input type="text" value={supplierForm.invoiceNumber} onChange={e => setSupplierForm({...supplierForm, invoiceNumber: e.target.value})} placeholder="Supplier's invoice number" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
+                    <div className="grid grid-cols-2 gap-3">
+                        <input type="number" value={supplierForm.amount} onChange={e => setSupplierForm({...supplierForm, amount: e.target.value})} placeholder="Amount ₹" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
+                        <input type="number" value={supplierForm.creditDays} onChange={e => setSupplierForm({...supplierForm, creditDays: e.target.value})} placeholder="Credit days" className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
+                    </div>
+                    <input type="date" value={supplierForm.date} onChange={e => setSupplierForm({...supplierForm, date: e.target.value})} className="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 bg-white"/>
+                </div>
+              </div>
               <button onClick={submitNewSupplier} className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 text-white rounded-xl font-black uppercase tracking-widest text-sm transition shadow-lg shadow-teal-500/30 active:scale-[0.98]">
-                Create Supplier
+                Save Supplier{supplierForm.invoiceNumber.trim() && supplierForm.amount ? ' + Invoice' : ''}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Quick Add Invoice Modal — shown from supplier card in list view */}
+      {addInvoiceOpen && invoiceFromCard && renderAddInvoiceModal()}
     </div>);
 }
