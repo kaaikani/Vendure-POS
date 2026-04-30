@@ -19,13 +19,26 @@ import path from 'path';
 const IS_DEV = process.env.APP_ENV === 'dev';
 const serverPort = +process.env.PORT || 3000;
 
+// CORS origins: comma-separated list in env (e.g. "http://localhost:3001,http://192.168.1.20:3001")
+// In dev, fall back to "true" (allow any origin). In production, require explicit list.
+const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()).filter(Boolean)
+    : (IS_DEV ? true : ['http://localhost:3001']);
+
 export const config: VendureConfig = {
     apiOptions: {
-        hostname: '127.0.0.1',
+        // 0.0.0.0 → listen on all network interfaces so other servers/devices can connect.
+        // Override via env: HOSTNAME=127.0.0.1 if you want loopback-only.
+        hostname: process.env.HOSTNAME || '0.0.0.0',
         port: serverPort,
         adminApiPath: 'admin-api',
         shopApiPath: 'shop-api',
         trustProxy: IS_DEV ? false : 1,
+        // CORS: allow the storefront origin(s) to call admin-api / shop-api from the browser.
+        cors: {
+            origin: corsOrigins,
+            credentials: true,
+        },
         // The following options are useful in development mode,
         // but are best turned off for production for security
         // reasons.

@@ -15,6 +15,12 @@ import BarcodeModule from './barcode-module';
 import DashboardModule from './dashboard-module';
 import ReportModule from './report-module';
 import CustomerModule from './customer-module';
+import StockUpdationModule from './stock-updation-module';
+import PurchaseReturnModule from './purchase-return-module';
+import StockAdjustmentModule from './stock-adjustment-module';
+import InwardModule from './inward-module';
+import PurchaseListModule from './purchase-list-module';
+import { TaxMasterModule, RateMasterModule, SizeMasterModule, BrandMasterModule, BrandwiseRateUpdateModule, CategorywiseRateUpdateModule, SalesManModule } from './master-modules';
 import { PosListUsersQuery, PosCreateUserCommand, PosUpdateUserCommand, PosDeleteUserCommand } from '../../core/queries/auth.query';
 
 // ── User Management Module ──
@@ -237,6 +243,10 @@ export default function VendureDashboard() {
     const [activeTab, setActiveTab] = useState(null);
     const [settingsSection, setSettingsSection] = useState('configuration');
     const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+    const [reportSection, setReportSection] = useState('purchase');
+    const [reportMenuOpen, setReportMenuOpen] = useState(false);
+    const [purchaseMenuOpen, setPurchaseMenuOpen] = useState(false);
+    const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
     const [activeCompany, setActiveCompany] = useState({ name: 'AVS ECOM PRIVATE LIMITED', financialYear: '2026-2027' });
     const [enabledSections, setEnabledSections] = useState({});
 
@@ -334,7 +344,7 @@ export default function VendureDashboard() {
         { id: 'inventory', label: 'Stock / Inventory', icon: Box },
         { id: 'category', label: 'Products (Vendure)', icon: Grid },
         { id: 'barcode', label: 'Barcode', icon: ScanLine },
-        { id: 'ledger', label: 'Supplier Ledger', icon: BookOpen },
+        { id: 'ledger', label: 'Ledger', icon: BookOpen },
         { id: 'customers', label: 'Customers', icon: User },
         { id: 'report', label: 'Reports', icon: FileText },
         { id: 'users', label: 'User Management', icon: Users },
@@ -350,6 +360,18 @@ export default function VendureDashboard() {
                 case 'token': return isAdmin ? <TokenEntryModule /> : null;
                 case 'itemmaster': return isAdmin ? <ItemMasterModule /> : null;
                 case 'purchase': return isAdmin ? <PurchaseModule /> : null;
+                case 'stock-updation': return isAdmin ? <StockUpdationModule /> : null;
+                case 'purchase-return': return isAdmin ? <PurchaseReturnModule /> : null;
+                case 'stock-adjustment': return isAdmin ? <StockAdjustmentModule /> : null;
+                case 'inward': return isAdmin ? <InwardModule /> : null;
+                case 'purchase-list': return isAdmin ? <PurchaseListModule /> : null;
+                case 'tax-master': return isAdmin ? <TaxMasterModule /> : null;
+                case 'rate-master': return isAdmin ? <RateMasterModule /> : null;
+                case 'size-master': return isAdmin ? <SizeMasterModule /> : null;
+                case 'brand-master': return isAdmin ? <BrandMasterModule /> : null;
+                case 'brandwise-rate': return isAdmin ? <BrandwiseRateUpdateModule /> : null;
+                case 'categorywise-rate': return isAdmin ? <CategorywiseRateUpdateModule /> : null;
+                case 'salesman': return isAdmin ? <SalesManModule /> : null;
                 case 'payment': return isAdmin ? <PaymentModule /> : null;
                 case 'receipt': return isAdmin ? <ReceiptModule /> : null;
                 case 'pos': return <PosModule />;
@@ -358,7 +380,7 @@ export default function VendureDashboard() {
                 case 'barcode': return isAdmin ? <BarcodeModule /> : null;
                 case 'ledger': return isAdmin ? <LedgerModule /> : null;
                 case 'customers': return isAdmin ? <CustomerModule /> : null;
-                case 'report': return isAdmin ? <ReportModule /> : null;
+                case 'report': return isAdmin ? <ReportModule initialReport={reportSection} key={reportSection}/> : null;
                 case 'users': return isAdmin ? <UserManagementModule /> : null;
                 case 'settings': return isAdmin ? <SettingsModule section={settingsSection} onChangeSection={setSettingsSection}/> : null;
                 default: return null;
@@ -402,12 +424,12 @@ export default function VendureDashboard() {
         { id: 'dashboard', label: 'Account\nMaster', icon: ClipboardList, bg: '#e74c3c', cfg: 'Show Account Master' },
         { id: 'ledger', label: 'Supplier', icon: BookOpen, bg: '#3498db', cfg: 'Show Supplier' },
         { id: 'customers', label: 'Customer', icon: User, bg: '#2ecc71', cfg: 'Show Customer' },
-        { id: 'category', label: 'Category', icon: Grid, bg: '#f39c12', cfg: 'Show Category' },
+        { id: 'category', label: 'Category', icon: Grid, bg: '#f39c12', cfg: 'Show Category', hasCategoryDropdown: true },
         { id: 'inventory', label: 'Inventory', icon: Box, bg: '#9b59b6', cfg: 'Show Inventory' },
-        { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c', cfg: 'Show Purchase' },
+        { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c', cfg: 'Show Purchase', hasPurchaseDropdown: true },
         { id: 'pos', label: 'Sales', icon: ShoppingBag, bg: '#e67e22', cfg: 'Show Sales' },
         { id: 'barcode', label: 'Barcode', icon: ScanLine, bg: '#34495e', cfg: 'Show Barcode' },
-        { id: 'report', label: 'Reports', icon: FileText, bg: '#2980b9', cfg: 'Show Reports' },
+        { id: 'report', label: 'Reports', icon: FileText, bg: '#2980b9', cfg: 'Show Reports', hasReportDropdown: true },
         { id: 'dashboard', label: 'DayBook\nEntry', icon: ClipboardList, bg: '#8e44ad', cfg: 'Show DayBook Entry' },
         { id: 'settings', label: 'Settings', icon: Settings, bg: '#7f8c8d', hasDropdown: true },
         { id: '_logout', label: 'Logout', icon: LogOut, bg: '#c0392b' },
@@ -422,7 +444,7 @@ export default function VendureDashboard() {
         { id: 'pos', label: 'Sales', icon: ShoppingBag, bg: '#2ecc71', cfg: 'Show Sales' },
         { id: 'payment', label: 'Payment', icon: Wallet, bg: '#27ae60', cfg: 'Show Payment' },
         { id: 'receipt', label: 'Receipt', icon: Receipt, bg: '#16a085', cfg: 'Show Receipt' },
-        { id: 'ledger', label: 'Customer\nLedger', icon: BookOpen, bg: '#2980b9', cfg: 'Show Customer Ledger' },
+        { id: 'ledger', label: 'Ledger', icon: BookOpen, bg: '#2980b9', cfg: 'Show Customer Ledger' },
         { id: 'report', label: 'Reports', icon: FileText, bg: '#8e44ad', cfg: 'Show Reports' },
     ];
     const sidebarItems = allSidebarItems.filter(it => !it.cfg || isSectionEnabled(it.cfg));
@@ -479,20 +501,109 @@ export default function VendureDashboard() {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           const isSettings = item.hasDropdown;
+          const isReport = item.hasReportDropdown;
+          const isPurchase = item.hasPurchaseDropdown;
+          const isCategory = item.hasCategoryDropdown;
+          const closeAllMenus = () => { setSettingsMenuOpen(false); setReportMenuOpen(false); setPurchaseMenuOpen(false); setCategoryMenuOpen(false); };
           return (<div key={i} className="relative">
             <button onClick={() => {
               if (item.id === '_logout') { handleLogout(); return; }
-              if (isSettings) { setSettingsMenuOpen(p => !p); return; }
+              if (isSettings) { closeAllMenus(); setSettingsMenuOpen(p => !p); return; }
+              if (isReport)   { closeAllMenus(); setReportMenuOpen(p => !p); return; }
+              if (isPurchase) { closeAllMenus(); setPurchaseMenuOpen(p => !p); return; }
+              if (isCategory) { closeAllMenus(); setCategoryMenuOpen(p => !p); return; }
               setActiveTab(item.id);
-              setSettingsMenuOpen(false);
+              closeAllMenus();
             }} className={`flex flex-col items-center justify-center rounded border transition-all min-w-[68px] h-[58px] px-1 ${isActive
               ? 'bg-blue-100 border-blue-400 shadow-inner'
               : 'bg-white border-[#c0c8d0] hover:bg-blue-50 hover:border-blue-300 shadow-sm'}`} style={{boxShadow: isActive ? 'inset 0 2px 4px rgba(0,0,0,0.15)' : '0 1px 3px rgba(0,0,0,0.1)'}}>
               <div className="w-8 h-8 rounded flex items-center justify-center mb-0.5" style={{background:item.bg}}>
                 <Icon size={18} className="text-white"/>
               </div>
-              <span className="text-[8px] font-bold text-[#2c3e50] leading-[10px] text-center whitespace-pre-line">{item.label}{isSettings && ' ▾'}</span>
+              <span className="text-[8px] font-bold text-[#2c3e50] leading-[10px] text-center whitespace-pre-line">{item.label}{(isSettings || isReport || isPurchase || isCategory) && ' ▾'}</span>
             </button>
+
+            {/* Purchase dropdown menu */}
+            {isPurchase && purchaseMenuOpen && (<>
+              <div className="fixed inset-0 z-40" onClick={()=>setPurchaseMenuOpen(false)}/>
+              <div className="absolute left-0 top-full mt-0.5 w-60 bg-white border-2 border-[#1a5276] shadow-2xl z-50" style={{color:'#000'}}>
+                <div className="bg-[#1abc9c] text-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest">🛒 Purchase</div>
+                {[
+                  { id: 'purchase',         label: 'Purchase' },
+                  { id: 'stock-updation',   label: 'Stock Updation' },
+                  { id: 'purchase-return',  label: 'Purchase Return' },
+                  { id: 'stock-adjustment', label: 'Stock Adjustment' },
+                  { id: 'inward',           label: 'Inward' },
+                  { id: 'purchase-list',    label: 'Purchase List' },
+                ].map(o => (
+                  <button key={o.id} onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveTab(o.id);
+                    setPurchaseMenuOpen(false);
+                  }} style={{color:'#000', background:'#fff'}}
+                    onMouseEnter={(e)=>{e.currentTarget.style.background='#1abc9c';e.currentTarget.style.color='#fff';}}
+                    onMouseLeave={(e)=>{e.currentTarget.style.background='#fff';e.currentTarget.style.color='#000';}}
+                    className="w-full text-left px-4 py-2 text-[12px] font-black border-b border-slate-200 last:border-0 transition block">
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </>)}
+
+            {/* Category dropdown menu */}
+            {isCategory && categoryMenuOpen && (<>
+              <div className="fixed inset-0 z-40" onClick={()=>setCategoryMenuOpen(false)}/>
+              <div className="absolute left-0 top-full mt-0.5 w-64 bg-white border-2 border-[#1a5276] shadow-2xl z-50" style={{color:'#000'}}>
+                <div className="bg-[#f39c12] text-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest">📂 Category</div>
+                {[
+                  { id: 'tax-master',           label: 'Tax Master' },
+                  { id: 'rate-master',          label: 'Rate Master' },
+                  { id: 'size-master',          label: 'Size Master' },
+                  { id: 'brand-master',         label: 'Brand Master' },
+                  { id: 'category',             label: 'Category' },
+                  { id: 'brandwise-rate',       label: 'Brandwise Rate Update' },
+                  { id: 'categorywise-rate',    label: 'CategorywiseRate Update' },
+                  { id: 'salesman',             label: 'SalesMan' },
+                ].map(o => (
+                  <button key={o.id} onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveTab(o.id);
+                    setCategoryMenuOpen(false);
+                  }} style={{color:'#000', background:'#fff'}}
+                    onMouseEnter={(e)=>{e.currentTarget.style.background='#f39c12';e.currentTarget.style.color='#fff';}}
+                    onMouseLeave={(e)=>{e.currentTarget.style.background='#fff';e.currentTarget.style.color='#000';}}
+                    className="w-full text-left px-4 py-2 text-[12px] font-black border-b border-slate-200 last:border-0 transition block">
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </>)}
+
+            {/* Reports dropdown menu */}
+            {isReport && reportMenuOpen && (<>
+              <div className="fixed inset-0 z-40" onClick={()=>setReportMenuOpen(false)}/>
+              <div className="absolute left-0 top-full mt-0.5 w-64 bg-white border-2 border-[#1a5276] shadow-2xl z-50" style={{color:'#000'}}>
+                <div className="bg-[#1a5276] text-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest">📊 Reports</div>
+                {[
+                  { id: 'purchase', label: 'Purchase Report', num: 1 },
+                  { id: 'sales',    label: 'Sales Report',    num: 2 },
+                  { id: 'stock',    label: 'Stock Report',    num: 3 },
+                ].map(r => (
+                  <button key={r.id} onClick={(e) => {
+                    e.stopPropagation();
+                    setReportSection(r.id);
+                    setActiveTab('report');
+                    setReportMenuOpen(false);
+                  }} style={{color:'#000', background:'#fff'}}
+                    onMouseEnter={(e)=>{e.currentTarget.style.background='#2980b9';e.currentTarget.style.color='#fff';}}
+                    onMouseLeave={(e)=>{e.currentTarget.style.background='#fff';e.currentTarget.style.color='#000';}}
+                    className="w-full text-left px-4 py-2.5 text-[13px] font-black border-b border-slate-200 last:border-0 transition flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full bg-[#1a5276] text-white flex items-center justify-center text-[11px] font-black">{r.num}</span>
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </>)}
 
             {/* Settings dropdown menu */}
             {isSettings && settingsMenuOpen && (<>

@@ -960,7 +960,7 @@ table{width:100%;border-collapse:collapse}
 
         {/* ── Sales1/2/3/4 tabs ── */}
         <div className="shrink-0 flex bg-white pl-2 pt-1 border-b border-[#888]">
-            {['Sales1','Sales2','Sales3','Sales4'].map(t => (
+            {['Sales1'].map(t => (
                 <button key={t} onClick={()=>setActiveSalesTab(t)}
                     className={`px-4 py-0.5 text-[11px] font-bold border-t border-l border-r border-[#888] ${activeSalesTab===t ? 'bg-white text-slate-900' : 'bg-[#e0e0e0] text-slate-700 hover:bg-[#ececec]'}`}>{t}</button>
             ))}
