@@ -9,6 +9,7 @@ export default function PurchaseModule() {
     const [selectedIdx, setSelectedIdx] = useState(-1);
 
     // Header form
+    const purNoRef = useRef(null);
     const [purNo, setPurNo] = useState('0');
     const [purDate, setPurDate] = useState(new Date().toISOString().split('T')[0]);
     const [invNo, setInvNo] = useState('');
@@ -197,7 +198,7 @@ export default function PurchaseModule() {
             {/* Row 1: PurNo | PurDate | Inv.No | InvDate | Supplier | Address */}
             <div className="flex items-center px-1 py-0.5 gap-2 text-[11px] font-bold border-b border-[#b0c4d0]">
                 <label className="w-12">PurNo</label>
-                <input type="text" value={purNo} onChange={e=>setPurNo(e.target.value)} className={`${topInp} w-16`}/>
+                <input ref={purNoRef} autoFocus type="text" value={purNo} onChange={e=>setPurNo(e.target.value)} className={`${topInp} w-16`}/>
                 <label className="ml-1 w-14">PurDate</label>
                 <input type="date" value={purDate} onChange={e=>setPurDate(e.target.value)} className={`${topInp} w-[115px]`}/>
                 <label className="ml-3 w-12">Inv.No</label>
@@ -337,6 +338,19 @@ export default function PurchaseModule() {
                 <div className="bg-white border border-[#2c3e50] text-right px-2 py-0.5 font-black text-slate-900 text-[11px]">{Math.round(totalAmount)}</div>
                 <div className="bg-white border border-[#2c3e50] border-t-0 text-right px-2 py-0.5 font-black text-slate-900 text-[11px]">0.0</div>
                 <div className="bg-white border border-[#2c3e50] border-t-0 text-right px-2 py-0.5 font-black text-slate-900 text-[11px]">0.0</div>
+            </div>
+        </div>
+
+        {/* Hotkeys legend */}
+        <div className="shrink-0 border-t border-[#7a9ca8] text-[10px] font-bold text-slate-900 bg-white">
+            <div className="bg-[#1a5276] text-white px-2 py-0.5 text-[9px] uppercase tracking-widest font-black">⌨ Hotkeys</div>
+            <div className="grid grid-cols-6 border border-[#aaa] border-t-0">
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">F1 - <u>S</u>ave</span>
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">F4 - <u>C</u>ancel</span>
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">F7 - Item Master</span>
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">↑↓ Navigate</span>
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">Enter - Pick</span>
+                <span className="px-2 py-0 border-b border-[#aaa]">Esc - Close</span>
             </div>
         </div>
     </div>);

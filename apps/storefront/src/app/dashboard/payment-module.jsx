@@ -12,6 +12,7 @@ export default function PaymentModule() {
     const [selectedIdx, setSelectedIdx] = useState(-1);
     const [mode, setMode] = useState('new');
 
+    const payNoRef = useRef(null);
     // Header form
     const [payNo, setPayNo] = useState('0');
     const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
@@ -229,7 +230,7 @@ export default function PaymentModule() {
         {/* Header form */}
         <div className="shrink-0 p-2" style={{ background: '#d4e6f1' }}>
             <div className="flex items-center gap-1 mb-1 text-[11px] font-bold">
-                <div className="flex items-center gap-1"><label>PayNo</label><input type="text" value={payNo} onChange={e=>setPayNo(e.target.value)} className="bg-white border border-[#7ba0b5] h-5 px-1 w-16 text-[11px] font-bold outline-none"/></div>
+                <div className="flex items-center gap-1"><label>PayNo</label><input ref={payNoRef} autoFocus type="text" value={payNo} onChange={e=>setPayNo(e.target.value)} className="bg-white border border-[#7ba0b5] h-5 px-1 w-16 text-[11px] font-bold outline-none"/></div>
                 <div className="flex items-center gap-1 ml-2"><label>PayDate</label><input type="date" value={payDate} onChange={e=>setPayDate(e.target.value)} className="bg-white border border-[#7ba0b5] h-5 px-1 w-28 text-[11px] font-bold outline-none"/></div>
                 <div className="flex items-center gap-1 ml-3"><label>Ref.No</label><input type="text" value={refNo} onChange={e=>setRefNo(e.target.value)} className="bg-white border border-[#7ba0b5] h-5 px-1 w-36 text-[11px] font-bold outline-none"/></div>
                 <div className="flex items-center gap-1 ml-3">
@@ -405,6 +406,19 @@ export default function PaymentModule() {
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        {/* Hotkeys legend */}
+        <div className="shrink-0 border-t border-[#7a9ca8] text-[10px] font-bold text-slate-900 bg-white">
+            <div className="bg-[#1a5276] text-white px-2 py-0.5 text-[9px] uppercase tracking-widest font-black">⌨ Hotkeys</div>
+            <div className="grid grid-cols-6 border border-[#aaa] border-t-0">
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">F1 - <u>S</u>ave</span>
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">F4 - <u>C</u>ancel</span>
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">↑↓ Navigate</span>
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">Enter - Pick</span>
+                <span className="px-2 py-0 border-r border-b border-[#aaa]">Tab - Next field</span>
+                <span className="px-2 py-0 border-b border-[#aaa]">Esc - Close</span>
             </div>
         </div>
     </div>);

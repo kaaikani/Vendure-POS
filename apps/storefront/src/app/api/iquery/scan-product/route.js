@@ -23,8 +23,11 @@ export async function POST(req) {
         }
       }
     `;
-        // Connect to local Vendure Backend strictly bypassing frontend direct access
-        const res = await fetch('http://127.0.0.1:3000/shop-api', {
+        // Connect to Vendure Backend (URL configured via env variable)
+        const VENDURE_BASE = (process.env.VENDURE_SHOP_API_URL ? process.env.VENDURE_SHOP_API_URL.replace(/\/shop-api$/, '') : null)
+            || process.env.NEXT_PUBLIC_VENDURE_API_URL
+            || 'http://127.0.0.1:3000';
+        const res = await fetch(`${VENDURE_BASE.replace(/\/$/, '')}/shop-api`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query, variables: { term: barcode } }),

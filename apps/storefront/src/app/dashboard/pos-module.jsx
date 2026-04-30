@@ -143,6 +143,26 @@ export default function PosModule() {
     const addRow = () => setRows(prev => [...prev, { sno: prev.length + 1, code: '', itemName: '', qty: '', rate: '', amount: '', total: '' }]);
 
     const updateRow = (idx, field, val) => {
+        // Stock guard: when user types qty manually, block exceeding available stock
+        if (field === 'qty') {
+            const r = rows[idx];
+            if (r && r.itemName) {
+                const prod = pharmaItems.find(p => p.code === r.code || p.itemName === r.itemName);
+                if (prod) {
+                    const stock = prod.minStkQty != null && prod.minStkQty !== '' ? parseFloat(prod.minStkQty)
+                                : prod.minStock != null && prod.minStock !== '' ? parseFloat(prod.minStock)
+                                : null;
+                    const newQty = parseFloat(val) || 0;
+                    // sum qty of same product in OTHER rows
+                    const otherRowsQty = rows.reduce((s, x, i) =>
+                        i !== idx && x.code === r.code && x.itemName === r.itemName ? s + (parseFloat(x.qty) || 0) : s, 0);
+                    if (stock != null && newQty + otherRowsQty > stock) {
+                        alert(`❌ INSUFFICIENT STOCK\n\n"${r.itemName}" — only ${stock} available.\n(Other rows: ${otherRowsQty}, you typed: ${newQty})`);
+                        return; // don't update
+                    }
+                }
+            }
+        }
         setRows(prev => prev.map((r, i) => {
             if (i !== idx) return r;
             const u = { ...r, [field]: val };
@@ -186,9 +206,44 @@ export default function PosModule() {
         setUnitDropdownRow(-1);
     };
 
+    // Read available stock from a pharma item (minStkQty preferred, else minStock)
+    const getItemStock = (item) => {
+        if (!item) return null;
+        if (item.minStkQty != null && item.minStkQty !== '') return parseFloat(item.minStkQty);
+        if (item.minStock != null && item.minStock !== '') return parseFloat(item.minStock);
+        return null; // unknown — don't block
+    };
+
+    // How much of this item is already in the cart (sum of qty across rows)
+    const cartQtyForItem = (item) => {
+        if (!item) return 0;
+        return rows.reduce((s, r) => {
+            if (r.code === item.code && r.itemName === item.itemName) {
+                return s + (parseFloat(r.qty) || 0);
+            }
+            return s;
+        }, 0);
+    };
+
     const pickItem = (item) => {
         if (!item) return;
         setSelectedProduct(item);
+
+        // Stock validation — block if item is out of stock
+        const stock = getItemStock(item);
+        if (stock != null && stock <= 0) {
+            alert(`❌ OUT OF STOCK\n\n"${item.itemName}" (Code: ${item.code}) is out of stock and cannot be added to the bill.\n\nPlease restock the item from Item Master / Purchase first.`);
+            return;
+        }
+        // If adding this would exceed available stock, block too
+        if (stock != null) {
+            const alreadyInCart = cartQtyForItem(item);
+            if (alreadyInCart + 1 > stock) {
+                alert(`❌ INSUFFICIENT STOCK\n\n"${item.itemName}" — only ${stock} available, but you've already added ${alreadyInCart} to the cart.`);
+                return;
+            }
+        }
+
         // Default to first size variant if available, else item's base rate
         const variants = getItemVariants(item);
         const defaultVariant = variants.length > 0 ? variants[0] : null;
@@ -1037,7 +1092,9 @@ table{width:100%;border-collapse:collapse}
                                                 className={`flex items-center gap-3 px-3 py-1 text-[11px] cursor-pointer border-b border-slate-100 ${suggestSelIdx === sIdx ? 'bg-yellow-200' : 'hover:bg-blue-50'}`}>
                                                 <span className="font-black text-slate-500 w-12">{p.code}</span>
                                                 <span className="font-black text-slate-900 flex-1 truncate">{p.itemName}</span>
-                                                <span className="font-black text-emerald-700 text-right">₹{p.salesRate || p.mrpRate || 0}</span>
+                                                {(() => { const s = getItemStock(p); return s != null && s <= 0
+                                                    ? <span className="font-black text-red-600 text-[9px] uppercase">⚠ Out of Stock</span>
+                                                    : <span className="font-black text-emerald-700 text-right">₹{p.salesRate || p.mrpRate || 0}</span>; })()}
                                             </div>
                                         ))}
                                     </div>
@@ -1060,7 +1117,9 @@ table{width:100%;border-collapse:collapse}
                                                 className={`flex items-center gap-3 px-3 py-1 text-[11px] cursor-pointer border-b border-slate-100 ${suggestSelIdx === sIdx ? 'bg-yellow-200' : 'hover:bg-blue-50'}`}>
                                                 <span className="font-black text-slate-500 w-12">{p.code}</span>
                                                 <span className="font-black text-slate-900 flex-1 truncate">{p.itemName}</span>
-                                                <span className="font-black text-emerald-700 text-right">₹{p.salesRate || p.mrpRate || 0}</span>
+                                                {(() => { const s = getItemStock(p); return s != null && s <= 0
+                                                    ? <span className="font-black text-red-600 text-[9px] uppercase">⚠ Out of Stock</span>
+                                                    : <span className="font-black text-emerald-700 text-right">₹{p.salesRate || p.mrpRate || 0}</span>; })()}
                                             </div>
                                         ))}
                                     </div>

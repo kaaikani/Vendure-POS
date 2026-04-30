@@ -1,9 +1,16 @@
 /**
  * GQL Utility for POS Storefront
  * Uses Vendure's token-based auth (vendure-auth-token header)
+ *
+ * Vendure base URL is read from NEXT_PUBLIC_VENDURE_API_URL.
+ * - Set this in .env when deploying to a different server.
+ * - Defaults to http://127.0.0.1:3000 for local dev.
  */
-const ADMIN_API = 'http://127.0.0.1:3000/admin-api';
-const SHOP_API = 'http://127.0.0.1:3000/shop-api';
+const VENDURE_BASE = (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_VENDURE_API_URL)
+    ? process.env.NEXT_PUBLIC_VENDURE_API_URL.replace(/\/$/, '')
+    : 'http://127.0.0.1:3000';
+const ADMIN_API = `${VENDURE_BASE}/admin-api`;
+const SHOP_API = `${VENDURE_BASE}/shop-api`;
 
 let _adminToken = null;
 let _loginPromise = null;

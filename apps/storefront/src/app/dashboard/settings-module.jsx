@@ -41,7 +41,7 @@ function loadConfig() { try { return JSON.parse(localStorage.getItem(CONFIG_KEY)
 function savePrintSettings(cfg) { localStorage.setItem(PRINT_SETTINGS_KEY, JSON.stringify(cfg)); }
 function loadPrintSettings() { try { return JSON.parse(localStorage.getItem(PRINT_SETTINGS_KEY) || '{}'); } catch { return {}; } }
 
-export default function SettingsModule({ section = 'company-creation', onChangeSection }) {
+export default function SettingsModule({ section = 'configuration', onChangeSection }) {
     const [companies, setCompanies] = useState([]);
     const [activeCompanyId, setActiveCompanyId] = useState('');
 
@@ -251,10 +251,138 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
     const lbl = "text-[12px] font-bold text-slate-900";
 
     const sections = [
+        { id: 'configuration', label: 'Configuration', icon: SettingsIcon },
         { id: 'company', label: 'Company', icon: Building2 },
         { id: 'user-creation', label: 'User Creation', icon: UserPlus },
         { id: 'barcode-design', label: 'Barcode Design', icon: ScanLine },
     ];
+
+    // ── Configuration: list of properties + load/save ──
+    const CONFIG_PROPS_KEY = 'pharma_config_properties';
+    const CONFIG_FORM_KEY = 'pharma_config_form';
+
+    const loadConfigProps = () => {
+        try { return JSON.parse(localStorage.getItem(CONFIG_PROPS_KEY) || 'null'); } catch { return null; }
+    };
+    const loadConfigForm = () => {
+        try { return JSON.parse(localStorage.getItem(CONFIG_FORM_KEY) || 'null'); } catch { return null; }
+    };
+
+    // Default property definitions — matches the reference UI
+    const DEFAULT_CONFIG_PROPS = [
+        { id: 1,  name: 'Show Account Master',       stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 2,  name: 'Show Supplier',             stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 3,  name: 'Show Customer',             stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 4,  name: 'Show Category',             stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 5,  name: 'Show Inventory',            stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 6,  name: 'Show Purchase',             stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 7,  name: 'Show Sales',                stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 8,  name: 'Show Barcode',              stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 9,  name: 'Show Reports',              stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 10, name: 'Show DayBook Entry',        stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 11, name: 'Show Token Entry',          stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 12, name: 'Show Item Master',          stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 13, name: 'Show Payment',              stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 14, name: 'Show Receipt',              stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 15, name: 'Show Customer Ledger',      stringValue: '',                              bitValue: true,  type: 'Section' },
+        { id: 16, name: 'WeightItem',                stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 17, name: 'SingleRate',                stringValue: '0-MultiRate / 1-SingleRate',    bitValue: false, type: 'General' },
+        { id: 20, name: 'Item - Company Dependent',  stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 21, name: 'AllowTax',                  stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 27, name: 'CalcRatePer',               stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 32, name: 'AutoGenItemCode',           stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 33, name: 'AutoMasterCode',            stringValue: '',                              bitValue: true,  type: 'General' },
+        { id: 34, name: 'AutoBackUp',                stringValue: '',                              bitValue: true,  type: 'General' },
+        { id: 37, name: 'AllowUpcCode',              stringValue: '',                              bitValue: true,  type: 'General' },
+        { id: 47, name: 'AllowSize',                 stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 54, name: 'Stock Checking Point Q-Qty / W-Weight', stringValue: 'Q',                  bitValue: false, type: 'General' },
+        { id: 72, name: 'AllowExpiryDate',           stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 74, name: 'PackDetail',                stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 75, name: 'AllowMRP',                  stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 90, name: 'Allow Brand',               stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 92, name: 'Allow Category',            stringValue: '',                              bitValue: false, type: 'General' },
+        { id: 93, name: 'IsAutoItemSelect',          stringValue: '0',                             bitValue: false, type: 'General' },
+    ];
+
+    const DEFAULT_CONFIG_FORM = {
+        modelType: 'Windows', model: 'A4IND', model1: 'A4IND',
+        postingLedger1: 'Sales A/c', postingLedger2: 'DD COMMISION',
+        printerName: 'Microsoft Print to PDF',
+        defaultBook: 'GST', defaultTax: 'GST 18%', defaultCategory: 'Na',
+        cstTax: 'Excempted Tax', printerName2: '', tvsPrinter: false,
+        salesDefaultFocus: 'ItemDetail', purchaseDefaultFocus: 'Type', salReturnDefaultFocus: 'ItemDetail',
+        filterBy1: 'All', condition1: '', filterBy2: 'All', condition2: '',
+    };
+
+    const [configProps, setConfigProps] = useState(loadConfigProps() || DEFAULT_CONFIG_PROPS);
+    const [configFormState, setConfigFormState] = useState(loadConfigForm() || DEFAULT_CONFIG_FORM);
+    const [configFilter1, setConfigFilter1] = useState('All');
+    const [configCondition1, setConfigCondition1] = useState('');
+    const [configFilter2, setConfigFilter2] = useState('All');
+    const [configCondition2, setConfigCondition2] = useState('');
+    const [configRowIdx, setConfigRowIdx] = useState(0);
+
+    const toggleConfigBit = (id) => {
+        setConfigProps(prev => prev.map(p => p.id === id ? { ...p, bitValue: !p.bitValue } : p));
+    };
+    const updateConfigString = (id, value) => {
+        setConfigProps(prev => prev.map(p => p.id === id ? { ...p, stringValue: value } : p));
+    };
+    const saveConfiguration = () => {
+        localStorage.setItem(CONFIG_PROPS_KEY, JSON.stringify(configProps));
+        localStorage.setItem(CONFIG_FORM_KEY, JSON.stringify(configFormState));
+        window.dispatchEvent(new Event('storage'));
+        alert('Configuration saved. Sections will refresh on next page reload.');
+    };
+    const cancelConfiguration = () => {
+        setConfigProps(loadConfigProps() || DEFAULT_CONFIG_PROPS);
+        setConfigFormState(loadConfigForm() || DEFAULT_CONFIG_FORM);
+    };
+
+    // Apply filter to property list (Filter By + Condition mimics the reference UI)
+    const filteredConfigProps = configProps.filter(p => {
+        if (configFilter1 !== 'All' && p.type !== configFilter1) return false;
+        if (configCondition1 && !String(p.name).toLowerCase().includes(configCondition1.toLowerCase())) return false;
+        if (configFilter2 !== 'All') {
+            if (configFilter2 === 'BitOn' && !p.bitValue) return false;
+            if (configFilter2 === 'BitOff' && p.bitValue) return false;
+        }
+        if (configCondition2 && !String(p.stringValue).toLowerCase().includes(configCondition2.toLowerCase())) return false;
+        return true;
+    });
+
+    // Keyboard navigation in Configuration: ↑↓ row, Space toggle BitValue, Ctrl+S save
+    useEffect(() => {
+        if (section !== 'configuration') return;
+        const onKey = (e) => {
+            const tag = (e.target.tagName || '').toUpperCase();
+            const inEditable = tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
+            if (e.key === 'ArrowDown' && !inEditable) { e.preventDefault(); setConfigRowIdx(p => Math.min(p+1, filteredConfigProps.length - 1)); }
+            else if (e.key === 'ArrowUp' && !inEditable) { e.preventDefault(); setConfigRowIdx(p => Math.max(p-1, 0)); }
+            else if (e.key === ' ' && !inEditable) {
+                e.preventDefault();
+                const row = filteredConfigProps[configRowIdx];
+                if (row) toggleConfigBit(row.id);
+            }
+            else if (e.key === 'Enter' && !inEditable) {
+                e.preventDefault();
+                const el = document.querySelector(`[data-config-row="${configRowIdx}"] input[type="text"]`);
+                el?.focus();
+            }
+            else if ((e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault(); saveConfiguration();
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [section, configRowIdx, filteredConfigProps, configProps]);
+
+    // Auto-scroll selected config row into view
+    useEffect(() => {
+        if (section !== 'configuration') return;
+        const el = document.querySelector(`[data-config-row="${configRowIdx}"]`);
+        el?.scrollIntoView({ block: 'nearest' });
+    }, [configRowIdx, section]);
 
     // ── Delete a company ──
     const handleCompanyDelete = (id) => {
@@ -411,6 +539,138 @@ export default function SettingsModule({ section = 'company-creation', onChangeS
                         </div>
                     </div>
                 </div>)}
+
+                {/* ═══ CONFIGURATION (replicates legacy POS configuration page) ═══ */}
+                {section === 'configuration' && (() => {
+                    const F = configFormState;
+                    const setF = (k, v) => setConfigFormState(prev => ({ ...prev, [k]: v }));
+                    const cinp = "bg-white border border-[#7a9ca8] h-[24px] px-2 text-[12px] font-bold text-slate-900 outline-none focus:border-[#1a5276] focus:bg-yellow-50";
+                    const csel = `${cinp} pr-6 appearance-none`;
+                    const lbl12 = "text-[12px] font-bold text-slate-900";
+                    return (<div className="bg-[#eaf3f8] border border-[#7a9ca8]">
+                        {/* Title bar matches reference image */}
+                        <div className="bg-gradient-to-b from-[#cfd9e0] to-[#aab8c3] px-3 py-1 border-b border-[#7a9ca8] flex items-center justify-between">
+                            <span className="text-slate-900 text-[12px] font-bold">Configuration - {(loadCompanies()[0]?.name) || 'AVS ECOM'} 2026-2027</span>
+                            <div className="flex items-center gap-1">
+                                <button className="w-5 h-5 bg-[#c0c0c0] border border-slate-600 text-[10px] leading-none">_</button>
+                                <button className="w-5 h-5 bg-[#c0c0c0] border border-slate-600 text-[10px] leading-none">□</button>
+                                <button className="w-5 h-5 bg-[#c0c0c0] border border-slate-600 text-[10px] leading-none">✕</button>
+                            </div>
+                        </div>
+
+                        {/* Header form — 3 columns, matches reference layout */}
+                        <div className="px-4 py-3 bg-[#eaf3f8] grid grid-cols-3 gap-x-6 gap-y-2 items-center">
+                            {/* Column 1 */}
+                            <div className="contents">
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-24`}>Model Type</label><select value={F.modelType} onChange={e=>setF('modelType', e.target.value)} className={`${csel} flex-1`}><option>Windows</option><option>Linux</option><option>Mac</option></select></div>
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-24`}>Default Book</label><select value={F.defaultBook} onChange={e=>setF('defaultBook', e.target.value)} className={`${csel} flex-1`}><option>GST</option><option>Non-GST</option></select></div>
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-32`}>Sales Default Focus</label><select value={F.salesDefaultFocus} onChange={e=>setF('salesDefaultFocus', e.target.value)} className={`${csel} flex-1`}><option>ItemDetail</option><option>Customer</option><option>Type</option></select></div>
+
+                                <div className="flex items-center gap-2">
+                                    <label className={`${lbl12} w-24`}>Model</label>
+                                    <input value={F.model} onChange={e=>setF('model', e.target.value)} className={`${cinp} w-20`}/>
+                                    <label className={`${lbl12}`}>Model1</label>
+                                    <input value={F.model1} onChange={e=>setF('model1', e.target.value)} className={`${cinp} w-20`}/>
+                                </div>
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-24`}>Default Tax</label><select value={F.defaultTax} onChange={e=>setF('defaultTax', e.target.value)} className={`${csel} flex-1`}><option>GST 18%</option><option>GST 12%</option><option>GST 5%</option><option>GST 0%</option></select></div>
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-32`}>Purchase Default Focus</label><select value={F.purchaseDefaultFocus} onChange={e=>setF('purchaseDefaultFocus', e.target.value)} className={`${csel} flex-1`}><option>Type</option><option>ItemDetail</option><option>Supplier</option></select></div>
+
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-24`}>Posting Ledger1</label><input value={F.postingLedger1} onChange={e=>setF('postingLedger1', e.target.value)} className={`${cinp} flex-1`}/></div>
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-24`}>Default Category</label><select value={F.defaultCategory} onChange={e=>setF('defaultCategory', e.target.value)} className={`${csel} flex-1`}><option>Na</option><option>Food</option><option>Medical</option></select></div>
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-32`}>SalReturn Default Focus</label><select value={F.salReturnDefaultFocus} onChange={e=>setF('salReturnDefaultFocus', e.target.value)} className={`${csel} flex-1`}><option>ItemDetail</option><option>Customer</option></select></div>
+
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-24`}>Posting Ledger 2</label><input value={F.postingLedger2} onChange={e=>setF('postingLedger2', e.target.value)} className={`${cinp} flex-1`}/></div>
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-24`}>CST Tax</label><input value={F.cstTax} onChange={e=>setF('cstTax', e.target.value)} className={`${cinp} flex-1 bg-yellow-50`}/></div>
+                                <div className="flex items-center gap-1 justify-end">
+                                    <button onClick={saveConfiguration} className="px-4 py-1 bg-[#dcdcdc] hover:bg-[#c8c8c8] border border-slate-600 text-slate-900 font-black text-[12px] rounded shadow-sm flex items-center gap-1"><Save size={12}/> Save</button>
+                                </div>
+
+                                <div className="flex items-center gap-2"><label className={`${lbl12} w-24`}>Printer Name</label><input value={F.printerName} onChange={e=>setF('printerName', e.target.value)} className={`${cinp} flex-1`}/></div>
+                                <div className="flex items-center gap-2">
+                                    <label className={`${lbl12} w-24`}>Printer Name</label>
+                                    <input value={F.printerName2} onChange={e=>setF('printerName2', e.target.value)} className={`${cinp} flex-1`}/>
+                                    <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={F.tvsPrinter} onChange={e=>setF('tvsPrinter', e.target.checked)}/><span className={lbl12}>Tvs Printer</span></label>
+                                </div>
+                                <div className="flex items-center justify-end gap-1">
+                                    <button onClick={cancelConfiguration} className="px-4 py-1 bg-[#dcdcdc] hover:bg-[#c8c8c8] border border-slate-600 text-slate-900 font-black text-[12px] rounded shadow-sm flex items-center gap-1"><X size={12}/> Cancel</button>
+                                </div>
+
+                                <div></div>
+                                <div></div>
+                                <div className="flex items-center justify-end gap-1">
+                                    <button className="px-3 py-1 bg-[#dcdcdc] hover:bg-[#c8c8c8] border border-slate-600 text-slate-900 font-black text-[11px] rounded shadow-sm">Terms & Condition</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Filter row */}
+                        <div className="bg-[#eaf3f8] px-4 py-2 border-y border-[#7a9ca8] flex items-center gap-3">
+                            <label className={lbl12}>Filter By</label>
+                            <select value={configFilter1} onChange={e=>setConfigFilter1(e.target.value)} className={`${csel} w-40`}>
+                                <option>All</option><option>Section</option><option>General</option>
+                            </select>
+                            <label className={lbl12}>Condition</label>
+                            <input value={configCondition1} onChange={e=>setConfigCondition1(e.target.value)} placeholder="Search by name" className={`${cinp} w-56`}/>
+
+                            <label className={`${lbl12} ml-4`}>Filter By</label>
+                            <select value={configFilter2} onChange={e=>setConfigFilter2(e.target.value)} className={`${csel} w-32`}>
+                                <option>All</option><option value="BitOn">Enabled</option><option value="BitOff">Disabled</option>
+                            </select>
+                            <label className={lbl12}>Condition</label>
+                            <input value={configCondition2} onChange={e=>setConfigCondition2(e.target.value)} placeholder="String value" className={`${cinp} w-40`}/>
+
+                            <button onClick={()=>{ setConfigFilter1('All'); setConfigCondition1(''); setConfigFilter2('All'); setConfigCondition2(''); }}
+                                className="ml-auto px-4 py-1 bg-[#dcdcdc] hover:bg-[#c8c8c8] border border-slate-600 text-slate-900 font-black text-[12px] rounded shadow-sm flex items-center gap-1"><RefreshCw size={12}/> Refresh</button>
+                        </div>
+
+                        {/* Properties table */}
+                        <div className="bg-white max-h-[55vh] overflow-auto border-b border-[#7a9ca8]">
+                            <table className="w-full text-[12px] border-collapse">
+                                <thead className="bg-[#cfd9e0] sticky top-0">
+                                    <tr>
+                                        <th className="border border-[#7a9ca8] px-2 py-1 text-left text-slate-900 font-black w-20">ConfigId</th>
+                                        <th className="border border-[#7a9ca8] px-2 py-1 text-left text-slate-900 font-black w-72">ConfigProperty</th>
+                                        <th className="border border-[#7a9ca8] px-2 py-1 text-left text-slate-900 font-black">StringValue</th>
+                                        <th className="border border-[#7a9ca8] px-2 py-1 text-center text-slate-900 font-black w-24">BitValue</th>
+                                        <th className="border border-[#7a9ca8] px-2 py-1 text-left text-slate-900 font-black w-28">Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredConfigProps.map((p, idx) => (
+                                        <tr key={p.id} data-config-row={idx}
+                                            onClick={()=>setConfigRowIdx(idx)}
+                                            className={`cursor-pointer ${configRowIdx === idx ? 'bg-yellow-200' : 'hover:bg-yellow-50'}`}>
+                                            <td className="border border-[#cbd5e1] px-2 py-0.5 font-bold text-slate-900">{p.id}</td>
+                                            <td className="border border-[#cbd5e1] px-2 py-0.5 font-bold text-slate-900">{p.name}</td>
+                                            <td className="border border-[#cbd5e1] p-0">
+                                                <input value={p.stringValue} onChange={e=>updateConfigString(p.id, e.target.value)}
+                                                    className="w-full h-[22px] px-2 text-[12px] font-bold outline-none focus:bg-yellow-50"/>
+                                            </td>
+                                            <td className="border border-[#cbd5e1] text-center">
+                                                <input type="checkbox" checked={!!p.bitValue} onChange={()=>toggleConfigBit(p.id)} className="w-4 h-4"/>
+                                            </td>
+                                            <td className="border border-[#cbd5e1] px-2 py-0.5 font-bold text-slate-700">{p.type}</td>
+                                        </tr>
+                                    ))}
+                                    {filteredConfigProps.length === 0 && (
+                                        <tr><td colSpan={5} className="text-center py-8 text-slate-500 font-bold">No properties match the filter.</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="px-4 py-2 bg-[#dcdcdc] border-t border-[#7a9ca8] flex items-center justify-between text-[11px] font-bold text-slate-700">
+                            <span>{filteredConfigProps.length} of {configProps.length} properties</span>
+                            <span className="flex gap-3">
+                                <span><kbd className="bg-white border border-slate-400 px-1 rounded font-mono">↑↓</kbd> Row</span>
+                                <span><kbd className="bg-white border border-slate-400 px-1 rounded font-mono">Space</kbd> Toggle</span>
+                                <span><kbd className="bg-white border border-slate-400 px-1 rounded font-mono">Enter</kbd> Edit String</span>
+                                <span><kbd className="bg-white border border-slate-400 px-1 rounded font-mono">Ctrl+S</kbd> Save</span>
+                                <span><kbd className="bg-white border border-slate-400 px-1 rounded font-mono">Esc</kbd> Close</span>
+                            </span>
+                        </div>
+                    </div>);
+                })()}
 
                 {/* USER CREATION */}
                 {section === 'user-creation' && (<div>

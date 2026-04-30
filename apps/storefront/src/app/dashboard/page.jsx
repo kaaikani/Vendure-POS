@@ -235,11 +235,12 @@ export default function VendureDashboard() {
     const [session, setSession] = useState(null);
     const [checking, setChecking] = useState(true);
     const [activeTab, setActiveTab] = useState(null);
-    const [settingsSection, setSettingsSection] = useState('user-creation');
+    const [settingsSection, setSettingsSection] = useState('configuration');
     const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
     const [activeCompany, setActiveCompany] = useState({ name: 'AVS ECOM PRIVATE LIMITED', financialYear: '2026-2027' });
+    const [enabledSections, setEnabledSections] = useState({});
 
-    // Read active company from localStorage and refresh when window regains focus / settings closes
+    // Read active company + section visibility from localStorage. Re-read on window focus and storage events.
     useEffect(() => {
         const refresh = () => {
             try {
@@ -250,6 +251,12 @@ export default function VendureDashboard() {
                     setActiveCompany({ name: active.name, financialYear: active.financialYear || '2026-2027' });
                 }
             } catch {}
+            try {
+                const props = JSON.parse(localStorage.getItem('pharma_config_properties') || '[]');
+                const map = {};
+                props.forEach(p => { map[p.name] = !!p.bitValue; });
+                setEnabledSections(map);
+            } catch {}
         };
         refresh();
         window.addEventListener('focus', refresh);
@@ -258,6 +265,28 @@ export default function VendureDashboard() {
             window.removeEventListener('focus', refresh);
             window.removeEventListener('storage', refresh);
         };
+    }, [activeTab]);
+
+    // Section visibility helper — when no config saved, all visible by default
+    const isSectionEnabled = (name) => enabledSections[name] !== false;
+
+    // Esc key → close current section back to home (always works, even from inputs)
+    useEffect(() => {
+        const onKey = (e) => {
+            if (e.key !== 'Escape') return;
+            if (!activeTab || activeTab === 'home') return;
+            // If any visible modal/popup is on screen, let it handle Esc first (don't close section).
+            // We detect this by looking for elements with z-[200] / z-[210] (our modal layers) or role="dialog".
+            const hasOpenModal = !!document.querySelector('[role="dialog"], .fixed.z-\\[200\\], .fixed.z-\\[210\\], .fixed.inset-0.bg-black\\/60, .fixed.inset-0.bg-slate-900\\/50, .fixed.inset-0.bg-slate-900\\/60, .fixed.inset-0.bg-black\\/70');
+            if (hasOpenModal) return;
+            // Blur any focused input first so the user clearly leaves the field, then close the section
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+            setActiveTab('home');
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
     }, [activeTab]);
 
     // Auth guard: check session on mount
@@ -368,55 +397,61 @@ export default function VendureDashboard() {
         );
     }
 
-    // ── Top toolbar icons (horizontal bar) ──
-    const toolbarItems = [
-        { id: 'dashboard', label: 'Account\nMaster', icon: ClipboardList, bg: '#e74c3c' },
-        { id: 'ledger', label: 'Supplier', icon: BookOpen, bg: '#3498db' },
-        { id: 'customers', label: 'Customer', icon: User, bg: '#2ecc71' },
-        { id: 'category', label: 'Category', icon: Grid, bg: '#f39c12' },
-        { id: 'inventory', label: 'Inventory', icon: Box, bg: '#9b59b6' },
-        { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c' },
-        { id: 'pos', label: 'Sales', icon: ShoppingBag, bg: '#e67e22' },
-        { id: 'barcode', label: 'Barcode', icon: ScanLine, bg: '#34495e' },
-        { id: 'report', label: 'Reports', icon: FileText, bg: '#2980b9' },
-        { id: 'dashboard', label: 'DayBook\nEntry', icon: ClipboardList, bg: '#8e44ad' },
+    // ── Top toolbar icons (horizontal bar) — filtered by Configuration toggles ──
+    const allToolbarItems = [
+        { id: 'dashboard', label: 'Account\nMaster', icon: ClipboardList, bg: '#e74c3c', cfg: 'Show Account Master' },
+        { id: 'ledger', label: 'Supplier', icon: BookOpen, bg: '#3498db', cfg: 'Show Supplier' },
+        { id: 'customers', label: 'Customer', icon: User, bg: '#2ecc71', cfg: 'Show Customer' },
+        { id: 'category', label: 'Category', icon: Grid, bg: '#f39c12', cfg: 'Show Category' },
+        { id: 'inventory', label: 'Inventory', icon: Box, bg: '#9b59b6', cfg: 'Show Inventory' },
+        { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c', cfg: 'Show Purchase' },
+        { id: 'pos', label: 'Sales', icon: ShoppingBag, bg: '#e67e22', cfg: 'Show Sales' },
+        { id: 'barcode', label: 'Barcode', icon: ScanLine, bg: '#34495e', cfg: 'Show Barcode' },
+        { id: 'report', label: 'Reports', icon: FileText, bg: '#2980b9', cfg: 'Show Reports' },
+        { id: 'dashboard', label: 'DayBook\nEntry', icon: ClipboardList, bg: '#8e44ad', cfg: 'Show DayBook Entry' },
         { id: 'settings', label: 'Settings', icon: Settings, bg: '#7f8c8d', hasDropdown: true },
         { id: '_logout', label: 'Logout', icon: LogOut, bg: '#c0392b' },
     ];
+    const toolbarItems = allToolbarItems.filter(it => !it.cfg || isSectionEnabled(it.cfg));
 
-    // ── Left sidebar buttons ──
-    const sidebarItems = [
-        { id: 'token', label: 'Token Entry', icon: Hash, bg: '#e67e22' },
-        { id: 'itemmaster', label: 'Item Master', icon: Package, bg: '#3498db' },
-        { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c' },
-        { id: 'pos', label: 'Sales', icon: ShoppingBag, bg: '#2ecc71' },
-        { id: 'payment', label: 'Payment', icon: Wallet, bg: '#27ae60' },
-        { id: 'receipt', label: 'Receipt', icon: Receipt, bg: '#16a085' },
-        { id: 'ledger', label: 'Customer\nLedger', icon: BookOpen, bg: '#2980b9' },
-        { id: 'report', label: 'Reports', icon: FileText, bg: '#8e44ad' },
+    // ── Left sidebar buttons — filtered by Configuration toggles ──
+    const allSidebarItems = [
+        { id: 'token', label: 'Token Entry', icon: Hash, bg: '#e67e22', cfg: 'Show Token Entry' },
+        { id: 'itemmaster', label: 'Item Master', icon: Package, bg: '#3498db', cfg: 'Show Item Master' },
+        { id: 'purchase', label: 'Purchase', icon: ShoppingCart, bg: '#1abc9c', cfg: 'Show Purchase' },
+        { id: 'pos', label: 'Sales', icon: ShoppingBag, bg: '#2ecc71', cfg: 'Show Sales' },
+        { id: 'payment', label: 'Payment', icon: Wallet, bg: '#27ae60', cfg: 'Show Payment' },
+        { id: 'receipt', label: 'Receipt', icon: Receipt, bg: '#16a085', cfg: 'Show Receipt' },
+        { id: 'ledger', label: 'Customer\nLedger', icon: BookOpen, bg: '#2980b9', cfg: 'Show Customer Ledger' },
+        { id: 'report', label: 'Reports', icon: FileText, bg: '#8e44ad', cfg: 'Show Reports' },
     ];
+    const sidebarItems = allSidebarItems.filter(it => !it.cfg || isSectionEnabled(it.cfg));
 
     // Home/welcome screen
     const showHome = activeTab === 'home' || activeTab === null;
 
-    // ── SALES (POS) → Full-screen mode for admin too ──
-    if (activeTab === 'pos') {
+    // ── ALL SECTIONS open in FULL-SCREEN mode (Esc to close) ──
+    const isFullScreenSection = activeTab && activeTab !== 'home' && activeTab !== null;
+    if (isFullScreenSection) {
+        const sectionTitle = (() => {
+            const m = adminMenuItems.find(m => m.id === activeTab); return m ? m.label : activeTab;
+        })();
         return (
             <div className="fixed inset-0 z-[100] bg-white flex flex-col">
-                {/* Slim top bar with company name + Close button */}
+                {/* Slim top bar with company name + section title + Close button */}
                 <div className="h-7 flex items-center justify-between px-3 shrink-0" style={{background:'linear-gradient(90deg, #1a5276, #2980b9)'}}>
                     <div className="flex items-center gap-2">
                         <span className="text-white text-xs font-black tracking-[3px]">{activeCompany.name}</span>
                         <span className="text-cyan-100 text-[10px] font-bold ml-2">— {activeCompany.financialYear}</span>
+                        <span className="text-cyan-100 text-[10px] font-bold ml-3">▸ {sectionTitle}</span>
                     </div>
                     <div className="flex items-center gap-3 text-[10px]">
                         <span className="text-cyan-100 font-bold">{session.displayName}</span>
-                        <button onClick={() => setActiveTab('home')} title="Close (back to Dashboard)" className="px-3 py-0.5 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded">✕ Close</button>
+                        <button onClick={() => setActiveTab('home')} title="Close (back to Dashboard, or press Esc)" className="px-3 py-0.5 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded">✕ Close (Esc)</button>
                     </div>
                 </div>
-                {/* Full POS module */}
-                <div className="flex-1 overflow-hidden">
-                    <PosModule />
+                <div className="flex-1 overflow-auto bg-[#ecf0f1]">
+                    {renderContent()}
                 </div>
             </div>
         );
@@ -464,6 +499,7 @@ export default function VendureDashboard() {
               <div className="fixed inset-0 z-40" onClick={()=>setSettingsMenuOpen(false)}/>
               <div className="absolute left-0 top-full mt-0.5 w-60 bg-white border-2 border-[#1a5276] shadow-2xl z-50" style={{color:'#000'}}>
                 {[
+                  { id: 'configuration', label: 'Configuration' },
                   { id: 'company', label: 'Company' },
                   { id: 'user-creation', label: 'User Creation' },
                   { id: 'barcode-design', label: 'Barcode Design' },
